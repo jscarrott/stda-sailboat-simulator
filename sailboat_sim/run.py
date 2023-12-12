@@ -85,8 +85,9 @@ def scenario_1(save=False):
 
     if actor_dynamics:
         x0[SAIL_STATE] = 48*pi/180
-
+    import polars
     x, t, r, sail, ref_heading = init_data_arrays(n_states, N_steps, x0)
+    x_polars = polars.from_numpy(x, None, orient="row")
 
     if True:
         x2, t2, r2, sail2, ref_heading = init_data_arrays(
