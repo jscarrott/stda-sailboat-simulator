@@ -87,7 +87,15 @@ impl Autopilot for RouteAutopilot {
         if due {
             let apparent =
                 calculate_apparent_wind(obs.heading, obs.vel_x_body, obs.vel_y_body, tw);
-            self.last_sail = sail_angle(apparent.angle, apparent.speed, self.sail_stretching);
+            // sail_angle() holds `self.last_sail` itself when apparent
+            // wind is below its reliability threshold, so we always
+            // call it and let the guard decide.
+            self.last_sail = sail_angle(
+                apparent.angle,
+                apparent.speed,
+                self.sail_stretching,
+                self.last_sail,
+            );
             self.last_sail_t = Some(obs.t);
         }
 
