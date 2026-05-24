@@ -6,8 +6,10 @@
 //! future hardware adapter will do the same from real sensors and to
 //! real servos. Neither side knows which the other is.
 
+pub mod fixed_heading;
 pub mod route;
 
+pub use fixed_heading::FixedHeadingAutopilot;
 pub use route::RouteAutopilot;
 
 /// World-frame wind sensed by the boat.
