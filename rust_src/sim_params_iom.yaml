@@ -1,0 +1,117 @@
+## IOM (International One Metre) RC sailing yacht — sim parameters.
+##
+## Approximate values for retrofit planning. Not derived from tank
+## tests; geometric scaling from the 4 m reference hull where I had no
+## direct number. Numbers I'm most confident in (class-rule constants)
+## are marked CR; tank/CFD-quality values would replace the rest.
+##
+## Class rule reference: https://www.iomicra.com/class-rules
+##
+## Re-check before relying on these for control tuning:
+##  - Use a real keel polar; the lateral_area / keel.height here is a guess.
+##  - Real IOMs have very high-AR fin keels; "stretching" tied to aspect
+##    ratio is roughly 6-8 for the fin, not 0.605 like the 4 m hull.
+##  - Sail rig swaps (A/B/C) change sail.area by ~2x — only the A rig
+##    is parameterised here.
+
+boat: {
+    sail: {
+        pressure_point_height: 0.62,    # ~ 40% of mast height above deck
+        height:                 1.55,   # A-rig mast height above deck, m
+        area:                   0.60,   # CR: A-rig total sail area, m^2
+        length:                 0.18,   # mean chord, m
+        stretching:             4.0     # high-AR tall narrow rig vs 0.961 for 4 m hull
+    },
+
+    rudder: {
+        stretching: 3.0,
+        area:       0.0050              # ~50 cm^2 blade, m^2
+    },
+
+    keel: {
+        height:      0.40,              # CR: max draft 420 mm, m
+        length:      0.07,              # fin chord (root), m
+        stretching:  6.0                # high-AR fin
+    },
+
+    length:           1.0,              # CR: 1000 mm LOA, m
+    mass:             4.0,              # CR: 4 kg total displacement, kg
+    height_bouyancy:  0.04,             # buoyancy-centre height, m
+    lateral_area:     0.08,             # fin + hull below waterline, m^2 (rough)
+    waterline_area:   0.12,             # m^2
+
+    # cog (centre of gravity) → component pressure points, all in metres
+    distance_cog_sail_pressure_point:  0.30,
+    distance_cog_keel_pressure_point:  0.05,
+    distance_cog_rudder:               0.40,
+    distance_mast_sail_pressure_point: 0.10,
+
+    # Moments of inertia: dominated by the bulb mass (~2.5 kg of lead
+    # at the bottom of a ~0.4 m fin). Using radius-of-gyration estimates:
+    #   r_x ≈ 0.27 m  (mass low + spread of rig height) → moi_x ≈ 0.30
+    #   r_y ≈ 0.27 m                                     → moi_y ≈ 0.30
+    #   r_z ≈ 0.30 m  (length-dominated)                 → moi_z ≈ 0.36
+    # An earlier guess (moi_x ≈ 0.08, roll_damping ≈ 0.05) destabilised
+    # the Dopri5 integrator at 3 m/s wind — the heeling moment from
+    # the 0.6 m² A rig overran the restoring/damping moments.
+    geometrical_moi_x: 0.00050,
+    geometrical_moi_y: 0.020,
+    moi_x: 0.30,
+    moi_y: 0.30,
+    moi_z: 0.36,
+
+    # Damping coefficients pushed higher than a pure geometric scale
+    # from the 4 m hull would suggest. With a 0.6 m² rig on a 4 kg boat
+    # the heeling and surge forces dominate; without enough dissipation
+    # the integrator hits MaxNumStepReached around 3 m/s wind.
+    # These values are stability-first, not physically derived — re-tune
+    # against pond-test telemetry when available.
+    roll_damping:        0.50,
+    pitch_damping:       0.30,
+    damping_z:           0.20,
+    yaw_timeconstant:    3.0,
+    along_damping:       5.0,
+    transverse_damping:  5.0,
+    hull_speed:          1.25            # ~1.34 × sqrt(LWL_ft) ≈ 1.25 m/s for 1 m LWL
+}
+
+environment: {
+    water_viscosity: 0.0000001,
+    air_viscosity:   0.0000171,
+    water_density:        1000,
+    air_density:           1.3,
+    gravity:              9.81
+}
+
+simulator: {
+    stepper: {
+        stepsize:   0.1,
+        clockrate:   10,
+    },
+    initial: {
+        vel_x: 0,
+        vel_y: 0,
+        vel_z: 0,
+
+        yaw:   0,
+        pitch: 0,
+        roll:  0,
+
+        roll_rate:  0,
+        pitch_rate: 0,
+        yaw_rate:   0,
+
+        latitude:     51.207,
+        longitude:    -4.110,
+
+        wind_strength:   3.0,
+        wind_direction:  90.0,
+
+        wave_direction: 0.0,
+        wave_length:    0.5,
+        wave_amplitude: 0.0,
+
+        sail_angle:   0.5,
+        rudder_angle: 0.0,
+    }
+}
