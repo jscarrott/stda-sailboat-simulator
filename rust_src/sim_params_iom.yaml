@@ -1,78 +1,68 @@
 ## IOM (International One Metre) RC sailing yacht — sim parameters.
 ##
-## Approximate values for retrofit planning. Not derived from tank
-## tests; geometric scaling from the 4 m reference hull where I had no
-## direct number. Numbers I'm most confident in (class-rule constants)
-## are marked CR; tank/CFD-quality values would replace the rest.
+## Derived by consistent geometric scaling of the 4 m reference hull
+## (sim_params_config.yaml) at length ratio λ = 0.25, with real IOM
+## class values substituted where known (mass, A-rig sail area, draft,
+## hull speed). Hand-tuned per-parameter guessing produced an
+## internally-inconsistent, directionally-unstable boat that spun on
+## every heading; scaling a hull that IS stable preserves the yaw
+## balance that keeps it tracking.
+##
+## Scaling rules: lengths ×λ; areas ×λ²; mass ×λ³ (≈5.5 kg, but the
+## real carbon IOM is the class-minimum 4 kg, used here); moments of
+## inertia ×(mass_ratio·λ²); waterplane second moments ×λ⁴; times
+## (yaw_timeconstant, damping) ×√λ; hull_speed ×√λ.
 ##
 ## Class rule reference: https://www.iomicra.com/class-rules
-##
-## Re-check before relying on these for control tuning:
-##  - Use a real keel polar; the lateral_area / keel.height here is a guess.
-##  - Real IOMs have very high-AR fin keels; "stretching" tied to aspect
-##    ratio is roughly 6-8 for the fin, not 0.605 like the 4 m hull.
-##  - Sail rig swaps (A/B/C) change sail.area by ~2x — only the A rig
-##    is parameterised here.
+## Calibrate against scripts -> `--scenario polar`; target speeds
+## (typical IOM): upwind ~1.0 m/s, reaching/running ~1.2-1.3 m/s.
 
 boat: {
     sail: {
-        pressure_point_height: 0.62,    # ~ 40% of mast height above deck
-        height:                 1.55,   # A-rig mast height above deck, m
+        pressure_point_height: 0.62,    # 2.48 ×λ
+        height:                 1.55,   # 6.2 ×λ (A-rig mast above deck)
         area:                   0.60,   # CR: A-rig total sail area, m^2
-        length:                 0.18,   # mean chord, m
-        stretching:             4.0     # high-AR tall narrow rig vs 0.961 for 4 m hull
+        length:                 0.25,   # 1.0 ×λ (chord)
+        stretching:             0.961   # dimensionless, kept from 4 m hull
     },
 
     rudder: {
-        stretching: 3.0,
-        area:       0.0050              # ~50 cm^2 blade, m^2
+        stretching: 2.326923076923077,  # dimensionless, kept
+        area:       0.0081               # 0.13 ×λ^2
     },
 
     keel: {
-        height:      0.40,              # CR: max draft 420 mm, m
-        length:      0.07,              # fin chord (root), m
-        stretching:  6.0                # high-AR fin
+        height:      0.1375,             # 0.55 ×λ
+        length:      0.50,               # 2.0 ×λ
+        stretching:  0.605               # dimensionless, kept
     },
 
-    length:           1.0,              # CR: 1000 mm LOA, m
-    mass:             4.0,              # CR: 4 kg total displacement, kg
-    height_bouyancy:  0.04,             # buoyancy-centre height, m
-    lateral_area:     0.08,             # fin + hull below waterline, m^2 (rough)
-    waterline_area:   0.12,             # m^2
+    length:           1.0,               # CR: 1000 mm LOA
+    mass:             4.0,               # CR: 4 kg class minimum
+    height_bouyancy:  0.0375,            # 0.15 ×λ
+    lateral_area:     0.156,             # 2.5 ×λ^2
+    waterline_area:   0.10,              # 1.6 ×λ^2
 
-    # cog (centre of gravity) → component pressure points, all in metres
-    distance_cog_sail_pressure_point:  0.30,
-    distance_cog_keel_pressure_point:  0.05,
-    distance_cog_rudder:               0.40,
-    distance_mast_sail_pressure_point: 0.10,
+    distance_cog_sail_pressure_point:  0.1075,  # 0.43 ×λ
+    distance_cog_keel_pressure_point:  0.06,    # 0.24 ×λ
+    distance_cog_rudder:               0.31,    # 1.24 ×λ
+    distance_mast_sail_pressure_point: 0.17,    # 0.68 ×λ
 
-    # Moments of inertia: dominated by the bulb mass (~2.5 kg of lead
-    # at the bottom of a ~0.4 m fin). Using radius-of-gyration estimates:
-    #   r_x ≈ 0.27 m  (mass low + spread of rig height) → moi_x ≈ 0.30
-    #   r_y ≈ 0.27 m                                     → moi_y ≈ 0.30
-    #   r_z ≈ 0.30 m  (length-dominated)                 → moi_z ≈ 0.36
-    # An earlier guess (moi_x ≈ 0.08, roll_damping ≈ 0.05) destabilised
-    # the Dopri5 integrator at 3 m/s wind — the heeling moment from
-    # the 0.6 m² A rig overran the restoring/damping moments.
-    geometrical_moi_x: 0.00050,
-    geometrical_moi_y: 0.020,
-    moi_x: 0.30,
-    moi_y: 0.30,
-    moi_z: 0.36,
+    # moments of inertia ×(mass_ratio·λ^2) = (4/350)·0.0625 = 7.14e-4
+    geometrical_moi_x: 0.00100,          # 0.256 ×λ^4
+    geometrical_moi_y: 0.100,            # 25.6 ×λ^4
+    moi_x: 0.0183,
+    moi_y: 1.143,
+    moi_z: 0.761,
 
-    # Damping coefficients pushed higher than a pure geometric scale
-    # from the 4 m hull would suggest. With a 0.6 m² rig on a 4 kg boat
-    # the heeling and surge forces dominate; without enough dissipation
-    # the integrator hits MaxNumStepReached around 3 m/s wind.
-    # These values are stability-first, not physically derived — re-tune
-    # against pond-test telemetry when available.
-    roll_damping:        0.50,
-    pitch_damping:       0.30,
-    damping_z:           0.20,
-    yaw_timeconstant:    3.0,
-    along_damping:       5.0,
-    transverse_damping:  5.0,
-    hull_speed:          1.25            # ~1.34 × sqrt(LWL_ft) ≈ 1.25 m/s for 1 m LWL
+    # ratios kept; times ×√λ = 0.5
+    roll_damping:      0.25,
+    pitch_damping:     0.25,
+    damping_z:         0.20,
+    yaw_timeconstant:  2.5,              # 5 ×√λ
+    along_damping:     7.5,              # 15 ×√λ
+    transverse_damping: 2.5,             # 5 ×√λ
+    hull_speed:        1.25              # CR-ish: 1.34·√LWL_ft ≈ 1.25 m/s
 }
 
 environment: {
@@ -83,18 +73,13 @@ environment: {
     gravity:              9.81
 }
 
-# LQR gains derived from yaw_timeconstant=3.0 with control-effort-
-# weighted weights Q=diag(0.1, 5.0, 0.3), r=300. The high r penalises
-# rudder activity so the controller doesn't excite the lightly-damped
-# heel mode of the IOM. The Python defaults (r=30, q_yawrate=1)
-# produced gains that destabilised the integrator on this hull.
-# Regenerate via:
-#   poetry run python scripts/compute_controller_gains.py \
-#       sim_params_iom.yaml --q-yawrate 5 --r 300
+# LQR gains for yaw_timeconstant=2.5, Python default weights
+# Q=diag(0.1, 1.0, 0.3), r=30. Regenerate via:
+#   poetry run python scripts/compute_controller_gains.py sim_params_iom.yaml
 controller_gains:
-  kp: 0.235364
-  ki: 0.031623
-  kd: 0.458831
+  kp: 0.532997
+  ki: 0.100000
+  kd: 0.790563
 
 simulator: {
     stepper: {
@@ -106,15 +91,7 @@ simulator: {
         vel_y: 0,
         vel_z: 0,
 
-        yaw:   0.5,                     # ~29°; off-axis from cardinal
-                                         # wind directions. solve()'s
-                                         # tanh sail-sign smoothing
-                                         # handles dead-downwind, but
-                                         # exact-beam (apparent ±π/2)
-                                         # combined with full-throw
-                                         # actuator dynamics can still
-                                         # trip Dopri5's stiffness
-                                         # detector. Off-axis dodges it.
+        yaw:   0.5,
         pitch: 0,
         roll:  0,
 

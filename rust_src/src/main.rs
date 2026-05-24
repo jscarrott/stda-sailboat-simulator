@@ -24,7 +24,7 @@ use std::path::PathBuf;
 
 use config::Config;
 use route::WindOverride;
-use scenario::{scenario_route, Solver, TidalParams, WindVariance};
+use scenario::{scenario_polar, scenario_route, Solver, TidalParams, WindVariance};
 
 #[derive(Parser, Debug)]
 #[command(name = "sailboat_sim", version, about = "6-DOF sailboat simulator")]
@@ -179,7 +179,28 @@ fn main() -> Result<()> {
             println!("wrote {}", out.display());
             report_route_progress(&run);
         }
-        other => bail!("unknown scenario {other:?}; supported: route"),
+        "polar" => {
+            let wind_speed = cli.wind_speed.unwrap_or(4.0);
+            let solver = match cli.solver.as_str() {
+                "dopri5" => Solver::Dopri5,
+                "rk4" => Solver::Rk4,
+                other => bail!("unknown --solver {other:?}; supported: dopri5, rk4"),
+            };
+            let polar = scenario_polar(&cfg, wind_speed, solver)?;
+            println!("speed polar at {:.1} m/s true wind ({} config):", wind_speed, cli.config.display());
+            println!("  TWA(deg)  speed(m/s)  speed(kn)  point of sail");
+            for (twa, sp) in &polar {
+                let pos = match *twa as i32 {
+                    t if t <= 50 => "close hauled",
+                    t if t <= 80 => "close reach",
+                    t if t <= 100 => "beam reach",
+                    t if t <= 150 => "broad reach",
+                    _ => "run",
+                };
+                println!("  {:>7.0}  {:>9.2}  {:>8.2}  {}", twa, sp, sp * 1.94384, pos);
+            }
+        }
+        other => bail!("unknown scenario {other:?}; supported: route, polar"),
     }
     Ok(())
 }

@@ -127,3 +127,82 @@ pub fn scenario_route(
     )?;
     Ok(RouteRun { result, route, chart })
 }
+
+/// Measure the boat's steady-state speed polar: for each true wind
+/// angle (TWA, the angle between heading and the wind), hold that
+/// heading with a `FixedHeadingAutopilot` in a constant wind and record
+/// the mean speed over the last third of the run (once transients have
+/// settled). Returns `(twa_deg, speed_mps)` pairs. The calibration
+/// instrument for the hull parameters.
+pub fn scenario_polar(
+    cfg: &Config,
+    wind_speed: f64,
+    solver: Solver,
+) -> Result<Vec<(f64, f64)>> {
+    use crate::autopilot::FixedHeadingAutopilot;
+    use crate::current_model::NoCurrent;
+    use crate::physics::wind::TrueWind;
+    use crate::state::{VEL_X, VEL_Y, YAW};
+    use crate::wind_model::ConstantWind;
+    use std::f64::consts::PI;
+
+    let inv = Invariants::from_config(cfg);
+    // Wind blows toward +y (north); it comes FROM the south (270° math).
+    let wind_from = 1.5 * PI;
+    let true_wind = TrueWind {
+        x: 0.0,
+        y: wind_speed,
+        strength: wind_speed,
+        direction: 90.0,
+    };
+    // Long enough to reach steady state on the slow points of sail.
+    let run_time = 600.0;
+    let n_steps = (run_time / SAMPLE_TIME) as usize;
+
+    let mut polar = Vec::new();
+    let mut twa_deg: f64 = 30.0;
+    while twa_deg <= 180.0 + 1e-6 {
+        let twa = twa_deg.to_radians();
+        let heading = wind_from - twa; // starboard tack
+        let mut env = Environment::from_config(cfg);
+        env.true_wind = true_wind;
+
+        let mut ap = FixedHeadingAutopilot::new(cfg, heading, SAMPLE_TIME);
+        let mut wind = ConstantWind::new(true_wind);
+        let mut current = NoCurrent;
+        let mut x0 = initial_state(cfg, true);
+        // Start pointed the right way with a little way on so the boat
+        // doesn't sit in irons while the controller spins it up.
+        x0[YAW] = heading;
+        x0[VEL_X] = 0.3;
+
+        let result = simulate(
+            cfg, &inv, env, &mut ap, &mut wind, &mut current,
+            SAMPLE_TIME, n_steps, x0, true, solver,
+        )?;
+
+        // Mean speed over the last third (steady state).
+        let n = result.x.len();
+        let start = n - n / 3;
+        let mut sum = 0.0;
+        for s in &result.x[start..] {
+            sum += (s[VEL_X] * s[VEL_X] + s[VEL_Y] * s[VEL_Y]).sqrt();
+        }
+        let speed = sum / (n - start) as f64;
+        if std::env::var("POLAR_DEBUG").is_ok() {
+            let last = &result.x[n - 1];
+            let final_yaw = last[YAW].to_degrees().rem_euclid(360.0);
+            eprintln!(
+                "  [dbg] twa={:.0} target_hdg={:.0} final_hdg={:.0} final_vx={:.2} final_vy={:.2}",
+                twa_deg,
+                heading.to_degrees().rem_euclid(360.0),
+                final_yaw,
+                last[VEL_X],
+                last[VEL_Y],
+            );
+        }
+        polar.push((twa_deg, speed));
+        twa_deg += 15.0;
+    }
+    Ok(polar)
+}
