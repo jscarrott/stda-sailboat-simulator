@@ -1,0 +1,28 @@
+name: lundy_circumnavigate
+acceptance_radius: 80.0
+close_hauled_angle_deg: 45.0
+xte_lookahead: 60.0
+min_tack_duration_s: 30.0
+
+# Local meters in the tangent-plane frame defined by
+# charts/lundy_coastline.json (origin: 51.1735°N, 4.6680°W).
+# Coastline span: x ∈ [-880, 1040], y ∈ [-1671, 3230].
+# Waypoints sit ~400 m off the coast for clearance.
+#
+# Wind from the southwest (math direction_deg 45° → velocity NE).
+# This gives a beat on the SW corner and a reach on the NE corner,
+# exercising both direct steering and tacking around the island.
+wind:
+  direction_deg: 45.0
+  speed: 6.0
+
+waypoints:
+  - { x:   400.0, y: -2100.0 }   # start: south of the island
+  - { x: -1300.0, y: -1500.0 }   # SW corner
+  - { x: -1300.0, y:  1500.0 }   # west side
+  - { x:  -800.0, y:  3600.0 }   # NW past the north tip
+  - { x:  1500.0, y:  3600.0 }   # north of any outlying rocks
+  - { x:  1500.0, y:     0.0 }   # east side
+  - { x:   400.0, y: -2100.0 }   # back to start
+
+loop: false
