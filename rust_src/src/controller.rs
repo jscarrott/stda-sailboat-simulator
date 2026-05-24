@@ -28,14 +28,22 @@ impl HeadingController {
         let b = &cfg.boat;
         let e = &cfg.environment;
         let factor = b.distance_cog_rudder * b.rudder.area * PI * e.water_density / b.moi_z;
+        // Prefer LQR-derived gains from the YAML; fall back to the 4 m
+        // hull's hand-tuned values (these match what
+        // heading_controller.py:33-35 actually runs with, which the
+        // Python-trace test depends on).
+        let (kp, ki, kd) = match cfg.controller_gains {
+            Some(g) => (g.kp, g.ki, g.kd),
+            None => (0.5, 0.1, 0.9),
+        };
         Self {
             sample_time,
             speed_adaption: 0.3,
             max_rudder_angle: 15.0_f64.to_radians(),
             factor,
-            kp: 0.5,
-            ki: 0.1,
-            kd: 0.9,
+            kp,
+            ki,
+            kd,
             summed_error: 0.0,
         }
     }
