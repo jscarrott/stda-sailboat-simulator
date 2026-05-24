@@ -137,8 +137,99 @@ fn main() -> Result<()> {
             );
             plot::plot_trajectory(&run.result, Some(&run.route), run.chart.as_ref(), &out)?;
             println!("wrote {}", out.display());
+            report_route_progress(&run);
         }
         other => bail!("unknown scenario {other:?}; supported: route"),
     }
     Ok(())
+}
+
+/// Post-run report: how far along the route the boat actually got, how
+/// fast it sailed, and the closest approach to each waypoint. Helps
+/// distinguish "ran out of time", "couldn't point upwind", and "missed
+/// the acceptance radius" failure modes.
+fn report_route_progress(run: &scenario::RouteRun) {
+    use state::{POS_X, POS_Y, VEL_X, VEL_Y};
+    let track = &run.result.x;
+    if track.len() < 2 {
+        return;
+    }
+
+    // Path length + speed stats.
+    let mut path_len = 0.0;
+    let mut max_speed: f64 = 0.0;
+    let mut speed_sum = 0.0;
+    for i in 0..track.len() {
+        let s = &track[i];
+        let speed = (s[VEL_X] * s[VEL_X] + s[VEL_Y] * s[VEL_Y]).sqrt();
+        max_speed = max_speed.max(speed);
+        speed_sum += speed;
+        if i > 0 {
+            let p = &track[i - 1];
+            path_len += ((s[POS_X] - p[POS_X]).powi(2) + (s[POS_Y] - p[POS_Y]).powi(2)).sqrt();
+        }
+    }
+    let mean_speed = speed_sum / track.len() as f64;
+
+    // Closest approach to each waypoint (in sequence, so a later
+    // waypoint's scan starts from where the previous one was captured).
+    let r = run.route.acceptance_radius;
+    let mut captured = 0;
+    let mut scan_from = 0usize;
+    println!("route progress (acceptance radius {:.0} m):", r);
+    for (wi, wp) in run.route.waypoints.iter().enumerate().skip(1) {
+        let mut closest = f64::INFINITY;
+        let mut capture_idx = None;
+        for i in scan_from..track.len() {
+            let s = &track[i];
+            let d = ((s[POS_X] - wp.x).powi(2) + (s[POS_Y] - wp.y).powi(2)).sqrt();
+            closest = closest.min(d);
+            if d < r && capture_idx.is_none() {
+                capture_idx = Some(i);
+            }
+        }
+        match capture_idx {
+            Some(i) => {
+                captured += 1;
+                scan_from = i;
+                println!(
+                    "  wp{} ({:.0},{:.0}): captured at t={:.0}s (closest {:.1} m)",
+                    wi, wp.x, wp.y, run.result.t[i], closest
+                );
+            }
+            None => {
+                println!(
+                    "  wp{} ({:.0},{:.0}): MISSED (closest {:.1} m)",
+                    wi, wp.x, wp.y, closest
+                );
+            }
+        }
+    }
+    println!(
+        "  {}/{} waypoints, path {:.0} m, mean {:.2} m/s, max {:.2} m/s",
+        captured,
+        run.route.waypoints.len() - 1,
+        path_len,
+        mean_speed,
+        max_speed
+    );
+
+    if std::env::var("DUMP_TRACK").is_ok() {
+        use state::YAW;
+        let n = track.len();
+        println!("  t,x,y,yaw_deg,speed");
+        for k in 0..=10 {
+            let i = (k * (n - 1)) / 10;
+            let s = &track[i];
+            let speed = (s[VEL_X] * s[VEL_X] + s[VEL_Y] * s[VEL_Y]).sqrt();
+            println!(
+                "  {:.0},{:.1},{:.1},{:.0},{:.2}",
+                run.result.t[i],
+                s[POS_X],
+                s[POS_Y],
+                s[YAW].to_degrees().rem_euclid(360.0),
+                speed
+            );
+        }
+    }
 }
