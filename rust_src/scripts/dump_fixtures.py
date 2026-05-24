@@ -86,7 +86,7 @@ FIXTURES = [
 ]
 
 
-def main():
+def dump_derivatives():
     rows = []
     for fx in FIXTURES:
         env = make_env(**fx["env"])
@@ -103,7 +103,56 @@ def main():
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
         json.dump({"fixtures": rows}, f, indent=2)
-    print(f"wrote {len(rows)} fixtures to {out_path}")
+    print(f"wrote {len(rows)} derivative fixtures to {out_path}")
+
+
+def dump_sail_angles():
+    from sail_angle import sail_angle
+    from math import pi
+    cases = []
+    stretching = sim.SAIL_STRETCHING
+    for wa_deg in (-170, -135, -90, -60, -45, -30, -15, 0, 15, 30, 45, 60, 90, 135, 170):
+        for ws in (1.0, 3.0, 5.0, 6.0, 8.0, 12.0):
+            wa = wa_deg * pi / 180.0
+            expected = float(sail_angle(wa, ws, stretching))
+            cases.append({"wind_angle": wa, "wind_speed": ws,
+                          "sail_stretching": float(stretching), "expected": expected})
+    out_path = os.path.join(RUST_SRC, "tests", "fixtures", "sail_angles.json")
+    with open(out_path, "w") as f:
+        json.dump({"cases": cases}, f, indent=2)
+    print(f"wrote {len(cases)} sail_angle cases to {out_path}")
+
+
+def dump_controller_traces():
+    from heading_controller import heading_controller
+    traces = []
+    # Trace 1: a 60-step ramp up to a 0.5 rad heading.
+    inputs1 = [{"desired_heading": 0.5, "heading": 0.0, "yaw_rate": 0.0,
+                "speed": 2.0, "roll": 0.0, "drift_angle": 0.0} for _ in range(60)]
+    # Trace 2: low-speed (triggers speed_adaption) with non-zero roll and drift.
+    inputs2 = [{"desired_heading": -0.7, "heading": 0.2, "yaw_rate": 0.05,
+                "speed": 0.1, "roll": 0.15, "drift_angle": 0.02} for _ in range(40)]
+    # Trace 3: large step that saturates and triggers anti-windup.
+    inputs3 = [{"desired_heading": 1.5, "heading": -1.5, "yaw_rate": 0.0,
+                "speed": 1.0, "roll": 0.0, "drift_angle": 0.0} for _ in range(30)]
+    for name, sample_time, ins in (("ramp", 0.3, inputs1),
+                                    ("low_speed_roll", 0.3, inputs2),
+                                    ("saturating_step", 0.3, inputs3)):
+        c = heading_controller(sample_time=sample_time)
+        outs = [float(c.controll(i["desired_heading"], i["heading"], i["yaw_rate"],
+                                  i["speed"], i["roll"], i["drift_angle"])) for i in ins]
+        traces.append({"name": name, "sample_time": sample_time,
+                       "inputs": ins, "outputs": outs})
+    out_path = os.path.join(RUST_SRC, "tests", "fixtures", "controller_traces.json")
+    with open(out_path, "w") as f:
+        json.dump({"traces": traces}, f, indent=2)
+    print(f"wrote {len(traces)} controller traces to {out_path}")
+
+
+def main():
+    dump_derivatives()
+    dump_sail_angles()
+    dump_controller_traces()
 
 
 if __name__ == "__main__":
