@@ -1,0 +1,544 @@
+{
+  "cases": [
+    {
+      "wind_angle": -2.9670597283903604,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": -2.9670597283903604,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": -2.9670597283903604,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": -2.9670597283903604,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": -2.9670597283903604,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": -2.9670597283903604,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": -2.356194490192345,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": -2.356194490192345,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": -2.356194490192345,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": -2.356194490192345,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": -2.356194490192345,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": -2.356194490192345,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": -1.5707963267948966,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 1.3264502315156905
+    },
+    {
+      "wind_angle": -1.5707963267948966,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 1.3264502315156905
+    },
+    {
+      "wind_angle": -1.5707963267948966,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 1.3264502315156905
+    },
+    {
+      "wind_angle": -1.5707963267948966,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 1.3264502315156905
+    },
+    {
+      "wind_angle": -1.5707963267948966,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 1.4333516482003432
+    },
+    {
+      "wind_angle": -1.5707963267948966,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 1.509709802975095
+    },
+    {
+      "wind_angle": -1.0471975511965976,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 0.8028514559173915
+    },
+    {
+      "wind_angle": -1.0471975511965976,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 0.8028514559173915
+    },
+    {
+      "wind_angle": -1.0471975511965976,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 0.8028514559173915
+    },
+    {
+      "wind_angle": -1.0471975511965976,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 0.8028514559173915
+    },
+    {
+      "wind_angle": -1.0471975511965976,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 0.9097528726020442
+    },
+    {
+      "wind_angle": -1.0471975511965976,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 0.9861110273767961
+    },
+    {
+      "wind_angle": -0.7853981633974483,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 0.5981187739105214
+    },
+    {
+      "wind_angle": -0.7853981633974483,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 0.5981187739105214
+    },
+    {
+      "wind_angle": -0.7853981633974483,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 0.5981187739105214
+    },
+    {
+      "wind_angle": -0.7853981633974483,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 0.5981187739105214
+    },
+    {
+      "wind_angle": -0.7853981633974483,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 0.6800535068110519
+    },
+    {
+      "wind_angle": -0.7853981633974483,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 0.7385783160257166
+    },
+    {
+      "wind_angle": -0.5235987755982988,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 0.42057786403829023
+    },
+    {
+      "wind_angle": -0.5235987755982988,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 0.42057786403829023
+    },
+    {
+      "wind_angle": -0.5235987755982988,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 0.42057786403829023
+    },
+    {
+      "wind_angle": -0.5235987755982988,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 0.42057786403829023
+    },
+    {
+      "wind_angle": -0.5235987755982988,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 0.465649512845794
+    },
+    {
+      "wind_angle": -0.5235987755982988,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 0.49784354770829664
+    },
+    {
+      "wind_angle": -0.2617993877991494,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 0.2153653347437623
+    },
+    {
+      "wind_angle": -0.2617993877991494,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 0.2153653347437623
+    },
+    {
+      "wind_angle": -0.2617993877991494,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 0.2153653347437623
+    },
+    {
+      "wind_angle": -0.2617993877991494,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 0.2153653347437623
+    },
+    {
+      "wind_angle": -0.2617993877991494,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 0.23568023295549415
+    },
+    {
+      "wind_angle": -0.2617993877991494,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 0.25019087453530264
+    },
+    {
+      "wind_angle": 0.0,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 0.0
+    },
+    {
+      "wind_angle": 0.0,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 0.0
+    },
+    {
+      "wind_angle": 0.0,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 0.0
+    },
+    {
+      "wind_angle": 0.0,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 0.0
+    },
+    {
+      "wind_angle": 0.0,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 0.0
+    },
+    {
+      "wind_angle": 0.0,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 0.0
+    },
+    {
+      "wind_angle": 0.2617993877991494,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 0.2153653347437623
+    },
+    {
+      "wind_angle": 0.2617993877991494,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 0.2153653347437623
+    },
+    {
+      "wind_angle": 0.2617993877991494,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 0.2153653347437623
+    },
+    {
+      "wind_angle": 0.2617993877991494,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 0.2153653347437623
+    },
+    {
+      "wind_angle": 0.2617993877991494,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 0.23568023295549415
+    },
+    {
+      "wind_angle": 0.2617993877991494,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 0.25019087453530264
+    },
+    {
+      "wind_angle": 0.5235987755982988,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 0.42057786403829023
+    },
+    {
+      "wind_angle": 0.5235987755982988,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 0.42057786403829023
+    },
+    {
+      "wind_angle": 0.5235987755982988,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 0.42057786403829023
+    },
+    {
+      "wind_angle": 0.5235987755982988,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 0.42057786403829023
+    },
+    {
+      "wind_angle": 0.5235987755982988,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 0.465649512845794
+    },
+    {
+      "wind_angle": 0.5235987755982988,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 0.49784354770829664
+    },
+    {
+      "wind_angle": 0.7853981633974483,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 0.5981187739105214
+    },
+    {
+      "wind_angle": 0.7853981633974483,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 0.5981187739105214
+    },
+    {
+      "wind_angle": 0.7853981633974483,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 0.5981187739105214
+    },
+    {
+      "wind_angle": 0.7853981633974483,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 0.5981187739105214
+    },
+    {
+      "wind_angle": 0.7853981633974483,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 0.6800535068110519
+    },
+    {
+      "wind_angle": 0.7853981633974483,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 0.7385783160257166
+    },
+    {
+      "wind_angle": 1.0471975511965976,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 0.8028514559173915
+    },
+    {
+      "wind_angle": 1.0471975511965976,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 0.8028514559173915
+    },
+    {
+      "wind_angle": 1.0471975511965976,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 0.8028514559173915
+    },
+    {
+      "wind_angle": 1.0471975511965976,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 0.8028514559173915
+    },
+    {
+      "wind_angle": 1.0471975511965976,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 0.9097528726020442
+    },
+    {
+      "wind_angle": 1.0471975511965976,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 0.9861110273767961
+    },
+    {
+      "wind_angle": 1.5707963267948966,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 1.3264502315156905
+    },
+    {
+      "wind_angle": 1.5707963267948966,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 1.3264502315156905
+    },
+    {
+      "wind_angle": 1.5707963267948966,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 1.3264502315156905
+    },
+    {
+      "wind_angle": 1.5707963267948966,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 1.3264502315156905
+    },
+    {
+      "wind_angle": 1.5707963267948966,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 1.4333516482003432
+    },
+    {
+      "wind_angle": 1.5707963267948966,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 1.509709802975095
+    },
+    {
+      "wind_angle": 2.356194490192345,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": 2.356194490192345,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": 2.356194490192345,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": 2.356194490192345,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": 2.356194490192345,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": 2.356194490192345,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": 2.9670597283903604,
+      "wind_speed": 1.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": 2.9670597283903604,
+      "wind_speed": 3.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": 2.9670597283903604,
+      "wind_speed": 5.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": 2.9670597283903604,
+      "wind_speed": 6.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": 2.9670597283903604,
+      "wind_speed": 8.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    },
+    {
+      "wind_angle": 2.9670597283903604,
+      "wind_speed": 12.0,
+      "sail_stretching": 0.961,
+      "expected": 1.5707963267948966
+    }
+  ]
+}

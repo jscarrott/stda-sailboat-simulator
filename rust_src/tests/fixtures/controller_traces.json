@@ -1,0 +1,1198 @@
+{
+  "traces": [
+    {
+      "name": "ramp",
+      "sample_time": 0.3,
+      "inputs": [
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 0.5,
+          "heading": 0.0,
+          "yaw_rate": 0.0,
+          "speed": 2.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        }
+      ],
+      "outputs": [
+        -0.13945310134624542,
+        -0.14734667312056118,
+        -0.15524024489487695,
+        -0.16313381666919274,
+        -0.1710273884435085,
+        -0.1789209602178243,
+        -0.18681453199214004,
+        -0.19470810376645584,
+        -0.20260167554077163,
+        -0.2104952473150874,
+        -0.21838881908940316,
+        -0.22628239086371893,
+        -0.2341759626380347,
+        -0.2420695344123505,
+        -0.24996310618666628,
+        -0.25785667796098205,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494
+      ]
+    },
+    {
+      "name": "low_speed_roll",
+      "sample_time": 0.3,
+      "inputs": [
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        },
+        {
+          "desired_heading": -0.7,
+          "heading": 0.2,
+          "yaw_rate": 0.05,
+          "speed": 0.1,
+          "roll": 0.15,
+          "drift_angle": 0.02
+        }
+      ],
+      "outputs": [
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494,
+        0.2617993877991494
+      ]
+    },
+    {
+      "name": "saturating_step",
+      "sample_time": 0.3,
+      "inputs": [
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        },
+        {
+          "desired_heading": 1.5,
+          "heading": -1.5,
+          "yaw_rate": 0.0,
+          "speed": 1.0,
+          "roll": 0.0,
+          "drift_angle": 0.0
+        }
+      ],
+      "outputs": [
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494,
+        -0.2617993877991494
+      ]
+    }
+  ]
+}

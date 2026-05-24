@@ -3,7 +3,9 @@
 #![allow(dead_code)]
 
 mod config;
+mod controller;
 mod physics;
+mod sail;
 mod state;
 
 use anyhow::Result;
