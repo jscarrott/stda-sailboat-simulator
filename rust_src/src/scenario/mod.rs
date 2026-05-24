@@ -6,6 +6,7 @@ use std::path::Path;
 use crate::autopilot::RouteAutopilot;
 use crate::chart::Chart;
 use crate::config::{Config, Invariants};
+use crate::current_model::{CurrentModel, NoCurrent, TidalStream};
 use crate::physics::forces::Environment;
 use crate::physics::solve::initial_state;
 use crate::route::{Route, WindOverride};
@@ -28,6 +29,16 @@ impl WindVariance {
     pub fn is_disabled(&self) -> bool {
         self.speed_sigma == 0.0 && self.direction_sigma_rad == 0.0
     }
+}
+
+/// CLI knobs for a uniform reversing tidal stream. `peak_speed == 0` →
+/// still water (`NoCurrent`).
+#[derive(Debug, Clone, Copy)]
+pub struct TidalParams {
+    pub peak_speed: f64,    // m/s
+    pub axis_rad: f64,      // flood direction (math angle)
+    pub period_s: f64,
+    pub phase_rad: f64,
 }
 
 const SAMPLE_TIME: f64 = 0.3;
@@ -54,6 +65,7 @@ pub fn scenario_route(
     max_run_time_s: f64,
     wind_override: Option<WindOverride>,
     variance: Option<WindVariance>,
+    tide: Option<TidalParams>,
     solver: Solver,
 ) -> Result<RouteRun> {
     let route = Route::load(route_path)?;
@@ -82,6 +94,14 @@ pub fn scenario_route(
         _ => Box::new(ConstantWind::new(env.true_wind)),
     };
 
+    // Build the tidal-current model. peak_speed == 0 → still water.
+    let mut current_model: Box<dyn CurrentModel> = match tide {
+        Some(p) if p.peak_speed != 0.0 => {
+            Box::new(TidalStream::new(p.peak_speed, p.axis_rad, p.period_s, p.phase_rad))
+        }
+        _ => Box::new(NoCurrent),
+    };
+
     let mut autopilot =
         RouteAutopilot::new(cfg, route.clone(), SAMPLE_TIME, SAIL_SAMPLE_TIME);
     let mut x0 = initial_state(cfg, true);
@@ -97,6 +117,7 @@ pub fn scenario_route(
         env,
         &mut autopilot,
         wind_model.as_mut(),
+        current_model.as_mut(),
         SAMPLE_TIME,
         n_steps,
         x0,

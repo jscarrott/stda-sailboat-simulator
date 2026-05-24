@@ -9,6 +9,7 @@ mod autopilot;
 mod chart;
 mod config;
 mod controller;
+mod current_model;
 mod physics;
 mod plot;
 mod route;
@@ -23,7 +24,7 @@ use std::path::PathBuf;
 
 use config::Config;
 use route::WindOverride;
-use scenario::{scenario_route, Solver, WindVariance};
+use scenario::{scenario_route, Solver, TidalParams, WindVariance};
 
 #[derive(Parser, Debug)]
 #[command(name = "sailboat_sim", version, about = "6-DOF sailboat simulator")]
@@ -84,6 +85,26 @@ struct Cli {
     #[arg(long, default_value = "dopri5")]
     solver: String,
 
+    /// Peak tidal-stream speed (m/s) for a uniform reversing current.
+    /// 0 (default) = still water. Bristol Channel springs near Lundy
+    /// run roughly 1.5-2 m/s.
+    #[arg(long, default_value_t = 0.0)]
+    tide_peak: f64,
+
+    /// Flood direction (compass degrees, the way the flood flows TOWARD).
+    /// Only used when --tide-peak > 0.
+    #[arg(long, default_value_t = 70.0)]
+    tide_flood_deg: f64,
+
+    /// Tidal period in hours (default 12.42 = semidiurnal M2).
+    #[arg(long, default_value_t = 12.42)]
+    tide_period_h: f64,
+
+    /// Tidal phase at t=0, in degrees of the cycle. 0 = slack water
+    /// going to flood; 90 = peak flood; 180 = slack to ebb.
+    #[arg(long, default_value_t = 0.0)]
+    tide_phase_deg: f64,
+
     /// Override the output PNG path. Defaults to `figs/route_<name>.png`.
     #[arg(long)]
     out: Option<PathBuf>,
@@ -115,6 +136,14 @@ fn main() -> Result<()> {
                 "rk4" => Solver::Rk4,
                 other => bail!("unknown --solver {other:?}; supported: dopri5, rk4"),
             };
+            // Compass bearing (flow TOWARD) → math angle in our east/north
+            // frame: theta = 90° − bearing.
+            let tide = TidalParams {
+                peak_speed: cli.tide_peak,
+                axis_rad: (90.0 - cli.tide_flood_deg).to_radians(),
+                period_s: cli.tide_period_h * 3600.0,
+                phase_rad: cli.tide_phase_deg.to_radians(),
+            };
             let run = scenario_route(
                 &cfg,
                 route_path,
@@ -122,6 +151,7 @@ fn main() -> Result<()> {
                 cli.max_run_time_s,
                 wind_override,
                 Some(variance),
+                Some(tide),
                 solver,
             )?;
             let out = cli.out.unwrap_or_else(|| {

@@ -3,6 +3,7 @@ use ode_solvers::{Dopri5, Rk4};
 
 use crate::autopilot::{Autopilot, Observation, WindReading};
 use crate::config::{Config, Invariants};
+use crate::current_model::CurrentModel;
 use crate::physics::forces::Environment;
 use crate::physics::solve::{
     OdeContext, MAX_RUDDER_SPEED, MAX_SAIL_SPEED, RUDDER_RATE, SAIL_RATE,
@@ -69,6 +70,7 @@ pub fn simulate(
     mut env: Environment,
     autopilot: &mut dyn Autopilot,
     wind: &mut dyn WindModel,
+    current: &mut dyn CurrentModel,
     sampletime: f64,
     n_steps: usize,
     x0: State,
@@ -108,6 +110,7 @@ pub fn simulate(
 
     for _ in 0..n_steps {
         env.true_wind = wind.sample(t, sampletime);
+        env.water_current = current.sample(t);
 
         let obs = Observation {
             t,
