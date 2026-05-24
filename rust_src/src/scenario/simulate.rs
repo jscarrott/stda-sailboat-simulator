@@ -6,6 +6,7 @@ use crate::config::{Config, Invariants};
 use crate::physics::forces::Environment;
 use crate::physics::solve::OdeContext;
 use crate::state::*;
+use crate::wind_model::WindModel;
 
 #[derive(Debug)]
 pub struct SimResult {
@@ -30,6 +31,7 @@ pub fn simulate(
     inv: &Invariants,
     mut env: Environment,
     autopilot: &mut dyn Autopilot,
+    wind: &mut dyn WindModel,
     sampletime: f64,
     n_steps: usize,
     x0: State,
@@ -54,6 +56,10 @@ pub fn simulate(
     result.x.push(to_array(&x));
 
     for _ in 0..n_steps {
+        // Refresh the wind once per outer step. For constant wind this
+        // is a no-op; for Ornstein–Uhlenbeck it integrates a gust step.
+        env.true_wind = wind.sample(t, sampletime);
+
         let obs = Observation {
             t,
             pos_x: x[POS_X],

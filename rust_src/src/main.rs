@@ -15,6 +15,7 @@ mod route;
 mod sail;
 mod scenario;
 mod state;
+mod wind_model;
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -22,7 +23,7 @@ use std::path::PathBuf;
 
 use config::Config;
 use route::WindOverride;
-use scenario::scenario_route;
+use scenario::{scenario_route, WindVariance};
 
 #[derive(Parser, Debug)]
 #[command(name = "sailboat_sim", version, about = "6-DOF sailboat simulator")]
@@ -59,6 +60,24 @@ struct Cli {
     #[arg(long)]
     wind_speed: Option<f64>,
 
+    /// Wind speed std-dev for the Ornstein-Uhlenbeck gust model (m/s).
+    /// Set together with --wind-time-constant; both default to 0 (constant wind).
+    #[arg(long, default_value_t = 0.0)]
+    wind_speed_sigma: f64,
+
+    /// Wind direction std-dev for the gust model (degrees).
+    #[arg(long, default_value_t = 0.0)]
+    wind_dir_sigma_deg: f64,
+
+    /// Correlation time τ for the OU gust process (seconds). Typical
+    /// real-wind values: 5-15 s for short gusts, 60-300 s for shifts.
+    #[arg(long, default_value_t = 30.0)]
+    wind_time_constant: f64,
+
+    /// Seed for the gust RNG (reproducibility).
+    #[arg(long, default_value_t = 0xC0FFEE_u64)]
+    wind_seed: u64,
+
     /// Override the output PNG path. Defaults to `figs/route_<name>.png`.
     #[arg(long)]
     out: Option<PathBuf>,
@@ -79,12 +98,19 @@ fn main() -> Result<()> {
                 (None, None) => None,
                 _ => bail!("--wind-deg and --wind-speed must be set together"),
             };
+            let variance = WindVariance {
+                speed_sigma: cli.wind_speed_sigma,
+                direction_sigma_rad: cli.wind_dir_sigma_deg.to_radians(),
+                correlation_time_s: cli.wind_time_constant,
+                seed: cli.wind_seed,
+            };
             let run = scenario_route(
                 &cfg,
                 route_path,
                 cli.chart.as_deref(),
                 cli.max_run_time_s,
                 wind_override,
+                Some(variance),
             )?;
             let out = cli.out.unwrap_or_else(|| {
                 PathBuf::from(format!("figs/route_{}.png", run.route.name))

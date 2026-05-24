@@ -106,7 +106,11 @@ simulator: {
         vel_y: 0,
         vel_z: 0,
 
-        yaw:   0,
+        yaw:   0.5,                     # ~29°; deliberately off-axis from
+                                         # any cardinal wind direction so
+                                         # the dead-downwind sign-flip
+                                         # singularity in solve()'s sail
+                                         # convention doesn't fire at t=0.
         pitch: 0,
         roll:  0,
 
@@ -124,7 +128,7 @@ simulator: {
         wave_length:    0.5,
         wave_amplitude: 0.0,
 
-        sail_angle:   0.5,
+        sail_angle:   0.0,
         rudder_angle: 0.0,
     }
 }
