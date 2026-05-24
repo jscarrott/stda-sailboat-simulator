@@ -217,18 +217,22 @@ fn report_route_progress(run: &scenario::RouteRun) {
     if std::env::var("DUMP_TRACK").is_ok() {
         use state::YAW;
         let n = track.len();
-        println!("  t,x,y,yaw_deg,speed");
-        for k in 0..=10 {
-            let i = (k * (n - 1)) / 10;
+        println!("  t,x,y,yaw_deg,speed,sail_deg,rudder_deg");
+        for k in 0..=20 {
+            let i = (k * (n - 1)) / 20;
             let s = &track[i];
             let speed = (s[VEL_X] * s[VEL_X] + s[VEL_Y] * s[VEL_Y]).sqrt();
+            // result.sail/rudder have one entry per step (n-1 total).
+            let si = i.min(run.result.sail.len().saturating_sub(1));
             println!(
-                "  {:.0},{:.1},{:.1},{:.0},{:.2}",
+                "  {:.0},{:.1},{:.1},{:.0},{:.2},{:.0},{:.0}",
                 run.result.t[i],
                 s[POS_X],
                 s[POS_Y],
                 s[YAW].to_degrees().rem_euclid(360.0),
-                speed
+                speed,
+                run.result.sail[si].to_degrees(),
+                run.result.rudder[si].to_degrees(),
             );
         }
     }
