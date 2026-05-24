@@ -8,8 +8,20 @@ use crate::autopilot::{Autopilot, Command, Observation};
 use crate::config::Config;
 use crate::controller::HeadingController;
 use crate::physics::wind::{calculate_apparent_wind, TrueWind};
-use crate::route::{Route, RouteFollower};
+use crate::route::{Route, RouteFollower, Tack};
 use crate::sail::sail_angle;
+
+/// Below this through-water speed (m/s) crab compensation is disabled:
+/// the boat has too little way on for the current triangle to be
+/// well-conditioned (it would demand huge crab angles), so we just
+/// point at the target and let it build speed first.
+const CRAB_MIN_WATER_SPEED: f64 = 0.5;
+
+/// Cap on the crab angle. Even if the perpendicular current is a large
+/// fraction of the boat's water speed, never offset the heading by more
+/// than this — a near-90° crab means the boat can't hold the course
+/// anyway, and a runaway offset just destabilises the heading loop.
+const MAX_CRAB_RAD: f64 = 40.0 * PI / 180.0;
 
 /// Hysteresis half-band (rad) around the tack (apparent angle 0) and
 /// gybe (apparent angle ±π) transitions. Inside the band the sail side
@@ -28,6 +40,10 @@ pub struct RouteAutopilot {
     /// Which side the sail is sheeted (+1 / −1), updated every tick with
     /// hysteresis. The signed command is `sail_side * last_sail_mag`.
     sail_side: f64,
+    /// When true, offset the commanded heading by a crab angle so the
+    /// resulting course over ground tracks the desired course despite
+    /// the tidal set (direct steering only — never while tacking).
+    crab_enabled: bool,
 }
 
 impl RouteAutopilot {
@@ -36,6 +52,7 @@ impl RouteAutopilot {
         route: Route,
         control_period_s: f64,
         sail_resample_period_s: f64,
+        crab_enabled: bool,
     ) -> Self {
         Self {
             follower: RouteFollower::new(route),
@@ -45,12 +62,37 @@ impl RouteAutopilot {
             last_sail_mag: 0.0,
             last_sail_t: None,
             sail_side: 1.0,
+            crab_enabled,
         }
     }
 
     pub fn route(&self) -> &Route {
         self.follower.route()
     }
+}
+
+/// Heading that makes good `desired_cog` (course over ground) given a
+/// `current` (global east/north m/s) and the boat's through-water speed
+/// `water_speed`. Solves the current triangle: the boat points upstream
+/// of the track by `asin(-c_perp / V_w)` so the cross-track component of
+/// the current is cancelled, capped at ±`MAX_CRAB_RAD` and disabled
+/// below `CRAB_MIN_WATER_SPEED`.
+///
+/// Caveat (why crab is opt-in): this is a pure kinematic triangle that
+/// ignores the sail polar. Crabbing toward the wind moves the boat to a
+/// finer point of sail and *reduces* `water_speed`, which then demands
+/// even more crab — a coupling that can stall a marginally-powered boat
+/// and destabilise the heading loop. The follower's reactive cross-track
+/// term holds moderate set well without this; doing crab properly needs
+/// polar-aware speed/heading planning.
+fn crab_heading(desired_cog: f64, current: (f64, f64), water_speed: f64) -> f64 {
+    if water_speed < CRAB_MIN_WATER_SPEED {
+        return desired_cog;
+    }
+    let (cx, cy) = current;
+    let c_perp = -cx * desired_cog.sin() + cy * desired_cog.cos();
+    let lim = MAX_CRAB_RAD.sin();
+    desired_cog + (-c_perp / water_speed).clamp(-lim, lim).asin()
 }
 
 /// Pick the sail side from the apparent wind angle, holding the previous
@@ -96,10 +138,30 @@ impl Autopilot for RouteAutopilot {
             }
         };
 
+        // Crab compensation: treat the follower's output as the desired
+        // course over ground and offset the commanded heading so the
+        // tide doesn't set the boat off track. Only when steering
+        // directly — while tacking the heading is wind-relative and
+        // already as high as the boat can point, so crabbing it would be
+        // wrong; the cross-track term handles set over successive tacks.
+        let has_current = obs.current.0 != 0.0 || obs.current.1 != 0.0;
+        let heading_ref = if self.crab_enabled
+            && has_current
+            && self.follower.current_tack() == Tack::None
+        {
+            // through-water speed = |ground velocity − current|
+            let vgx = obs.vel_x_body * obs.heading.cos() - obs.vel_y_body * obs.heading.sin();
+            let vgy = obs.vel_x_body * obs.heading.sin() + obs.vel_y_body * obs.heading.cos();
+            let water_speed = (vgx - obs.current.0).hypot(vgy - obs.current.1);
+            crab_heading(desired, obs.current, water_speed)
+        } else {
+            desired
+        };
+
         let speed = obs.vel_x_body.hypot(obs.vel_y_body);
         let drift = obs.vel_y_body.atan2(obs.vel_x_body);
         let rudder = self.heading_controller.control(
-            desired,
+            heading_ref,
             obs.heading,
             obs.yaw_rate,
             speed,
@@ -183,12 +245,32 @@ mod tests {
             vel_x_body: 1.0,
             vel_y_body: 0.0,
             true_wind: WindReading { direction: -std::f64::consts::PI / 2.0, speed: 5.0 },
+            current: (0.0, 0.0),
         }
     }
 
     #[test]
+    fn crab_heading_cancels_cross_track_current() {
+        // Desired course due east (0 rad). Current sets north at 0.5 m/s,
+        // boat makes 1 m/s through the water. The boat must point south
+        // of east by asin(0.5/1) = 30° to hold an easterly ground track.
+        let h = crab_heading(0.0, (0.0, 0.5), 1.0);
+        assert!((h - (-(0.5_f64).asin())).abs() < 1e-9, "got {}", h);
+        // No cross-track component (current along the track) → no crab.
+        let h2 = crab_heading(0.0, (0.7, 0.0), 1.0);
+        assert!(h2.abs() < 1e-9, "got {}", h2);
+        // Perpendicular current exceeds water speed → saturates at the
+        // -MAX_CRAB_RAD cap rather than running to -90°.
+        let h3 = crab_heading(0.0, (0.0, 5.0), 1.0);
+        assert!((h3 + MAX_CRAB_RAD).abs() < 1e-9, "got {}", h3);
+        // Too slow for crab → returns the desired course unchanged.
+        let h4 = crab_heading(0.0, (0.0, 0.5), 0.3);
+        assert!(h4.abs() < 1e-9, "got {}", h4);
+    }
+
+    #[test]
     fn autopilot_signals_mission_complete_when_route_done() {
-        let mut ap = RouteAutopilot::new(&cfg(), straight_north_route(), 0.3, 2.0);
+        let mut ap = RouteAutopilot::new(&cfg(), straight_north_route(), 0.3, 2.0, true);
         // Step once well inside acceptance radius of the only target.
         let cmd = ap.step(&obs(0.0, 0.0, 99.0));
         assert!(cmd.mission_complete, "captured final waypoint should end mission");
@@ -196,7 +278,7 @@ mod tests {
 
     #[test]
     fn autopilot_emits_finite_rudder_and_sail() {
-        let mut ap = RouteAutopilot::new(&cfg(), straight_north_route(), 0.3, 2.0);
+        let mut ap = RouteAutopilot::new(&cfg(), straight_north_route(), 0.3, 2.0, true);
         let cmd = ap.step(&obs(0.0, 0.0, 0.0));
         assert!(cmd.rudder_angle.is_finite());
         assert!(cmd.sail_angle.is_finite());

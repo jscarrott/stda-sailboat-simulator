@@ -41,6 +41,12 @@ pub struct Observation {
     pub vel_x_body: f64,
     pub vel_y_body: f64,
     pub true_wind: WindReading,
+    /// Estimated water (tidal) current in the global frame, m/s
+    /// (east, north). On hardware this comes from a tidal-stream atlas
+    /// or is inferred from GPS course/speed vs heading/log; in the sim
+    /// it's the true current. `(0, 0)` when unknown or still water —
+    /// crab compensation then does nothing.
+    pub current: (f64, f64),
 }
 
 /// What the autopilot wants the actuators set to this tick.

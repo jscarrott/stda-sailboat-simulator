@@ -66,6 +66,7 @@ pub fn scenario_route(
     wind_override: Option<WindOverride>,
     variance: Option<WindVariance>,
     tide: Option<TidalParams>,
+    crab: bool,
     solver: Solver,
 ) -> Result<RouteRun> {
     let route = Route::load(route_path)?;
@@ -103,7 +104,7 @@ pub fn scenario_route(
     };
 
     let mut autopilot =
-        RouteAutopilot::new(cfg, route.clone(), SAMPLE_TIME, SAIL_SAMPLE_TIME);
+        RouteAutopilot::new(cfg, route.clone(), SAMPLE_TIME, SAIL_SAMPLE_TIME, crab);
     let mut x0 = initial_state(cfg, true);
     if let Some(start) = route.waypoints.first() {
         x0[POS_X] = start.x;

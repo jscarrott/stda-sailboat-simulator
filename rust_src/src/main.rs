@@ -105,6 +105,15 @@ struct Cli {
     #[arg(long, default_value_t = 0.0)]
     tide_phase_deg: f64,
 
+    /// Enable experimental tide crab-angle feed-forward (off by
+    /// default). The route follower's cross-track term already holds
+    /// the rhumb line well for moderate set; crab adds a feed-forward
+    /// heading offset to counter the current directly. Note it ignores
+    /// the polar, so crabbing toward the wind can cost drive — see the
+    /// note in autopilot::route.
+    #[arg(long)]
+    crab: bool,
+
     /// Override the output PNG path. Defaults to `figs/route_<name>.png`.
     #[arg(long)]
     out: Option<PathBuf>,
@@ -152,6 +161,7 @@ fn main() -> Result<()> {
                 wind_override,
                 Some(variance),
                 Some(tide),
+                cli.crab,
                 solver,
             )?;
             let out = cli.out.unwrap_or_else(|| {
