@@ -121,7 +121,15 @@ impl<'a> System<f64, State> for OdeContext<'a> {
             - (cfg.boat.moi_x - cfg.boat.moi_z) * roll_rate * yaw_rate)
             / cfg.boat.moi_y;
 
-        let distance_cog_keel_middle = cfg.boat.distance_cog_keel_pressure_point - 0.7;
+        // When the keel stalls (separated flow) its centre of pressure
+        // shifts aft. The Python original hardcoded a 0.7 m shift, which
+        // is ~0.18·LOA for the 4 m hull but absurd on a 1 m boat (it put
+        // the separated CoP behind the transom, spinning the boat on any
+        // reach with leeway). Scale it with length: 0.175·LOA reproduces
+        // 0.7 m at LOA=4 exactly, so the 4 m hull and its fixtures are
+        // unchanged.
+        let distance_cog_keel_middle =
+            cfg.boat.distance_cog_keel_pressure_point - 0.175 * cfg.boat.length;
         let delta_yaw_rate = (damping.yaw
             - rudder_force.y * cfg.boat.distance_cog_rudder
             + sail_force.y * cfg.boat.distance_cog_sail_pressure_point
