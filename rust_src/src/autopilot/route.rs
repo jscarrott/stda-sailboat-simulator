@@ -2,6 +2,8 @@
 //! controller → sail-trim optimiser, all wired together behind the
 //! `Autopilot` trait.
 
+use std::f64::consts::PI;
+
 use crate::autopilot::{Autopilot, Command, Observation};
 use crate::config::Config;
 use crate::controller::HeadingController;
@@ -9,13 +11,23 @@ use crate::physics::wind::{calculate_apparent_wind, TrueWind};
 use crate::route::{Route, RouteFollower};
 use crate::sail::sail_angle;
 
+/// Hysteresis half-band (rad) around the tack (apparent angle 0) and
+/// gybe (apparent angle ±π) transitions. Inside the band the sail side
+/// is held rather than flipped, so a boat oscillating across
+/// dead-downwind doesn't gybe-slam the rig side-to-side. ~25°.
+const SAIL_SIDE_DEADBAND: f64 = 0.44;
+
 pub struct RouteAutopilot {
     follower: RouteFollower,
     heading_controller: HeadingController,
     sail_stretching: f64,
     sail_resample_period_s: f64,
-    last_sail: f64,
+    /// Sail trim *magnitude* (always ≥ 0), resampled periodically.
+    last_sail_mag: f64,
     last_sail_t: Option<f64>,
+    /// Which side the sail is sheeted (+1 / −1), updated every tick with
+    /// hysteresis. The signed command is `sail_side * last_sail_mag`.
+    sail_side: f64,
 }
 
 impl RouteAutopilot {
@@ -30,13 +42,30 @@ impl RouteAutopilot {
             heading_controller: HeadingController::new(cfg, control_period_s),
             sail_stretching: cfg.boat.sail.stretching,
             sail_resample_period_s,
-            last_sail: 0.0,
+            last_sail_mag: 0.0,
             last_sail_t: None,
+            sail_side: 1.0,
         }
     }
 
     pub fn route(&self) -> &Route {
         self.follower.route()
+    }
+}
+
+/// Pick the sail side from the apparent wind angle, holding the previous
+/// side through the ambiguous bands around dead-ahead (tack) and
+/// dead-astern (gybe). Away from those bands the side follows the wind:
+/// positive apparent angle → +1, negative → −1 (matching the old
+/// `sign(apparent_angle)` convention).
+fn next_sail_side(apparent_angle: f64, prev: f64) -> f64 {
+    let a = apparent_angle.abs();
+    if a <= SAIL_SIDE_DEADBAND || a >= PI - SAIL_SIDE_DEADBAND {
+        prev
+    } else if apparent_angle >= 0.0 {
+        1.0
+    } else {
+        -1.0
     }
 }
 
@@ -61,7 +90,7 @@ impl Autopilot for RouteAutopilot {
             None => {
                 return Command {
                     rudder_angle: 0.0,
-                    sail_angle: self.last_sail,
+                    sail_angle: self.sail_side * self.last_sail_mag,
                     mission_complete: true,
                 };
             }
@@ -78,38 +107,44 @@ impl Autopilot for RouteAutopilot {
             drift,
         );
 
-        // Sail trim is re-optimised at `sail_resample_period_s`; in
-        // between, hold the last command so winch motion is smooth.
+        let apparent =
+            calculate_apparent_wind(obs.heading, obs.vel_x_body, obs.vel_y_body, tw);
+
+        // Sail trim *magnitude* is re-optimised at `sail_resample_period_s`;
+        // between resamples we hold it. sail_angle() itself holds the
+        // previous magnitude when apparent wind is too weak to trust.
         let due = match self.last_sail_t {
             None => true,
             Some(prev) => obs.t - prev >= self.sail_resample_period_s,
         };
         if due {
-            let apparent =
-                calculate_apparent_wind(obs.heading, obs.vel_x_body, obs.vel_y_body, tw);
-            // sail_angle() holds `self.last_sail` itself when apparent
-            // wind is below its reliability threshold, so we always
-            // call it and let the guard decide.
-            self.last_sail = sail_angle(
+            self.last_sail_mag = sail_angle(
                 apparent.angle,
                 apparent.speed,
                 self.sail_stretching,
-                self.last_sail,
+                self.last_sail_mag,
             );
             self.last_sail_t = Some(obs.t);
         }
 
+        // Sail *side* is updated every tick with hysteresis, so the rig
+        // doesn't gybe-slam when the boat wanders across dead-downwind.
+        // The signed command, slew-limited by the runner, carries the
+        // sail smoothly across centreline during a real tack or gybe.
+        self.sail_side = next_sail_side(apparent.angle, self.sail_side);
+
         Command {
             rudder_angle: rudder,
-            sail_angle: self.last_sail,
+            sail_angle: self.sail_side * self.last_sail_mag,
             mission_complete: false,
         }
     }
 
     fn reset(&mut self) {
         self.heading_controller.reset();
-        self.last_sail = 0.0;
+        self.last_sail_mag = 0.0;
         self.last_sail_t = None;
+        self.sail_side = 1.0;
     }
 }
 
