@@ -1,0 +1,24 @@
+name: crosscurrent
+acceptance_radius: 15.0
+close_hauled_angle_deg: 45.0
+xte_lookahead: 60.0
+min_tack_duration_s: 30.0
+
+# A single 1.5 km leg due east, sailed as a beam reach in a southerly
+# wind (the boat's default initial heading is east, so it starts on the
+# leg with good drive — no degenerate startup). Used to show tidal set
+# and crab compensation cleanly. Run with a steady northerly set:
+#   --wind-deg 90 --wind-speed 6 --tide-peak 0.4 --tide-flood-deg 0 \
+#   --tide-period-h 500 --tide-phase-deg 90
+# Without --no-crab the track holds the y=0 rhumb line; with --no-crab
+# the boat is set north and only the cross-track term reels it back,
+# so the track bows downstream.
+wind:
+  direction_deg: 90.0
+  speed: 6.0
+
+waypoints:
+  - { x:    0.0, y: 0.0 }
+  - { x: 1500.0, y: 0.0 }
+
+loop: false

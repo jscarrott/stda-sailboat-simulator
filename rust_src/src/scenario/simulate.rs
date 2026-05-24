@@ -125,6 +125,7 @@ pub fn simulate(
                 direction: env.true_wind.y.atan2(env.true_wind.x),
                 speed: env.true_wind.strength,
             },
+            current: env.water_current,
         };
 
         let raw_cmd = autopilot.step(&obs);
