@@ -3,12 +3,12 @@ pub mod simulate;
 use anyhow::Result;
 use std::path::Path;
 
+use crate::autopilot::RouteAutopilot;
 use crate::chart::Chart;
 use crate::config::{Config, Invariants};
-use crate::controller::HeadingController;
 use crate::physics::forces::Environment;
 use crate::physics::solve::initial_state;
-use crate::route::{Route, RouteFollower};
+use crate::route::Route;
 use crate::state::{POS_X, POS_Y};
 
 pub use simulate::{simulate, SimResult};
@@ -23,11 +23,11 @@ pub struct RouteRun {
 }
 
 /// Load a route from `route_path`, optionally load a chart for overlay,
-/// run the simulator with a `RouteFollower` driving the heading
-/// reference, and return the trajectory + route + chart for the plotter.
+/// run the simulator driven by a `RouteAutopilot`, and return the
+/// trajectory + route + chart for the plotter.
 ///
 /// `max_run_time_s` caps wall-clock-equivalent simulation length.
-/// Increase for large routes (Lundy circumnavigation is ~16 km).
+/// Increase for large routes (Ilfracombe → Lundy round trip is ~95 km).
 pub fn scenario_route(
     cfg: &Config,
     route_path: &Path,
@@ -42,10 +42,9 @@ pub fn scenario_route(
     if let Some(w) = route.wind {
         env.true_wind = w.to_true_wind();
     }
-    let true_wind = env.true_wind;
 
-    let mut follower = RouteFollower::new(route.clone());
-    let mut controller = HeadingController::new(cfg, SAMPLE_TIME);
+    let mut autopilot =
+        RouteAutopilot::new(cfg, route.clone(), SAMPLE_TIME, SAIL_SAMPLE_TIME);
     let mut x0 = initial_state(cfg, true);
     if let Some(start) = route.waypoints.first() {
         x0[POS_X] = start.x;
@@ -53,17 +52,6 @@ pub fn scenario_route(
     }
     let n_steps = (max_run_time_s / SAMPLE_TIME) as usize;
 
-    let result = simulate(
-        cfg,
-        &inv,
-        env,
-        &mut controller,
-        SAIL_SAMPLE_TIME,
-        SAMPLE_TIME,
-        n_steps,
-        x0,
-        true,
-        |t, state| follower.update(t, state[POS_X], state[POS_Y], true_wind),
-    )?;
+    let result = simulate(cfg, &inv, env, &mut autopilot, SAMPLE_TIME, n_steps, x0, true)?;
     Ok(RouteRun { result, route, chart })
 }
