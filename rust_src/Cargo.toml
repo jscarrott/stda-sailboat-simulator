@@ -3,7 +3,16 @@ name = "sailboat_sim"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-polars = { version = "0.35.4", features = ["ndarray"] }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+ode_solvers = "0.4"
+nalgebra = "0.32"
+plotters = { version = "0.3", default-features = false, features = [
+    "bitmap_backend",
+    "bitmap_encoder",
+    "all_series",
+    "all_elements",
+] }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
