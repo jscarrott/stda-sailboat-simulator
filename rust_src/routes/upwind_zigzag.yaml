@@ -2,11 +2,13 @@ name: upwind_zigzag
 acceptance_radius: 5.0
 close_hauled_angle_deg: 45.0
 xte_lookahead: 15.0
-min_tack_duration_s: 6.0   # longer hold so a tack cycle is visible in the plot
+min_tack_duration_s: 6.0   # long hold so a tack cycle is visible in the plot
 
-# Wind from due north; route runs directly upwind so tacking is forced.
+# Math-coords direction the wind BLOWS TOWARD. 270° = -y = south,
+# i.e. the wind comes from the north. The leg below runs due north,
+# directly upwind — forcing the route follower to tack.
 wind:
-  direction_deg: 90.0
+  direction_deg: 270.0
   speed: 5.0
 
 waypoints:

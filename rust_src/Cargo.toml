@@ -8,12 +8,7 @@ serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
 ode_solvers = "0.4"
 nalgebra = "0.32"
-plotters = { version = "0.3", default-features = false, features = [
-    "bitmap_backend",
-    "bitmap_encoder",
-    "all_series",
-    "all_elements",
-] }
+plotters = "0.3"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 
