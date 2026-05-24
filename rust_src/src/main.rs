@@ -5,6 +5,7 @@
 // the modules with per-item allows.
 #![allow(dead_code)]
 
+mod autopilot;
 mod chart;
 mod config;
 mod controller;

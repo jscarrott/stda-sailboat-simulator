@@ -1,12 +1,10 @@
 use anyhow::Result;
 use ode_solvers::Dopri5;
 
+use crate::autopilot::{Autopilot, Observation, WindReading};
 use crate::config::{Config, Invariants};
-use crate::controller::HeadingController;
 use crate::physics::forces::Environment;
 use crate::physics::solve::OdeContext;
-use crate::physics::wind::calculate_apparent_wind;
-use crate::sail::sail_angle;
 use crate::state::*;
 
 #[derive(Debug)]
@@ -15,32 +13,33 @@ pub struct SimResult {
     pub x: Vec<[f64; N_STATES_ACTUATED]>,
     pub rudder: Vec<f64>,
     pub sail: Vec<f64>,
-    pub ref_heading: Vec<f64>,
 }
 
-/// Run the outer control loop and inner ODE integration. Mirrors the
-/// Python `simulate()` in `run.py:333`. The `heading_provider` closure
-/// receives `(t, state)` each control step and returns the desired
-/// heading, or `None` to stop early (used by the route follower when
-/// the final waypoint is captured).
+/// Run the outer control loop and inner ODE integration.
+///
+/// Each outer step at `sampletime` the runner:
+///   1. Builds an `Observation` from the current state + environment.
+///   2. Calls `autopilot.step(obs)` to get actuator commands.
+///   3. Writes the commands into the environment and integrates one
+///      step with Dopri5.
+///
+/// The sim has no knowledge of what kind of autopilot it is — same
+/// trait will be driven from real hardware sensors / servos.
 pub fn simulate(
     cfg: &Config,
     inv: &Invariants,
     mut env: Environment,
-    controller: &mut HeadingController,
-    sail_sampletime: f64,
+    autopilot: &mut dyn Autopilot,
     sampletime: f64,
     n_steps: usize,
     x0: State,
     actor_dynamics: bool,
-    mut heading_provider: impl FnMut(f64, &State) -> Option<f64>,
 ) -> Result<SimResult> {
     let mut result = SimResult {
         t: Vec::with_capacity(n_steps + 1),
         x: Vec::with_capacity(n_steps + 1),
         rudder: Vec::with_capacity(n_steps),
         sail: Vec::with_capacity(n_steps),
-        ref_heading: Vec::with_capacity(n_steps),
     };
     let mut x = x0;
     let mut t = 0.0;
@@ -54,43 +53,42 @@ pub fn simulate(
     result.t.push(t);
     result.x.push(to_array(&x));
 
-    let sail_every = ((sail_sampletime / sampletime).round() as usize).max(1);
-    let mut last_sail = env.sail_angle;
-
-    for i in 0..n_steps {
-        let speed = (x[VEL_X].powi(2) + x[VEL_Y].powi(2)).sqrt();
-        let drift = x[VEL_Y].atan2(x[VEL_X]);
-
-        let desired = match heading_provider(t, &x) {
-            Some(h) => h,
-            None => break,
+    for _ in 0..n_steps {
+        let obs = Observation {
+            t,
+            pos_x: x[POS_X],
+            pos_y: x[POS_Y],
+            heading: x[YAW],
+            yaw_rate: x[YAW_RATE],
+            roll: x[ROLL],
+            vel_x_body: x[VEL_X],
+            vel_y_body: x[VEL_Y],
+            true_wind: WindReading {
+                direction: env.true_wind.y.atan2(env.true_wind.x),
+                speed: env.true_wind.strength,
+            },
         };
 
-        let rudder = controller.control(desired, x[YAW], x[YAW_RATE], speed, x[ROLL], drift);
-        env.rudder_angle = rudder;
-
-        if i % sail_every == 0 {
-            let apparent = calculate_apparent_wind(x[YAW], x[VEL_X], x[VEL_Y], env.true_wind);
-            let new_sail = sail_angle(apparent.angle, apparent.speed, cfg.boat.sail.stretching);
-            env.sail_angle = new_sail;
-            last_sail = new_sail;
-        } else {
-            env.sail_angle = last_sail;
+        let cmd = autopilot.step(&obs);
+        if cmd.mission_complete {
+            break;
         }
+        env.rudder_angle = cmd.rudder_angle;
+        env.sail_angle = cmd.sail_angle;
 
-        result.rudder.push(rudder);
+        result.rudder.push(env.rudder_angle);
         result.sail.push(env.sail_angle);
-        result.ref_heading.push(desired);
 
         let ctx = OdeContext { cfg, inv, env, actor_dynamics };
         let mut stepper = Dopri5::new(ctx, t, t + sampletime, 0.01, x, 1e-6, 1e-9);
-        stepper.integrate().map_err(|e| anyhow::anyhow!("dopri5 step at t={}: {:?}", t, e))?;
+        stepper
+            .integrate()
+            .map_err(|e| anyhow::anyhow!("dopri5 step at t={}: {:?}", t, e))?;
         x = *stepper.y_out().last().expect("dopri5 produces at least one output");
         t += sampletime;
 
         result.t.push(t);
         result.x.push(to_array(&x));
     }
-
     Ok(result)
 }
