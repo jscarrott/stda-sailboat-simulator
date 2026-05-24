@@ -177,6 +177,13 @@ pub struct Environment {
     pub rudder_angle: f64,
     pub true_wind: crate::physics::wind::TrueWind,
     pub wave: crate::physics::wave::Wave,
+    /// Water (tidal) current in the global frame, m/s (east, north).
+    /// Hydrodynamic forces act on the boat's velocity *relative to the
+    /// water*, so this is subtracted from the boat's ground velocity
+    /// before computing keel / rudder / hull-drag forces, and the
+    /// position derivative carries the boat over ground = through-water
+    /// velocity + current. Zero for still water.
+    pub water_current: (f64, f64),
 }
 
 impl Environment {
@@ -197,6 +204,7 @@ impl Environment {
                 direction: i.wave_direction,
                 amplitude: i.wave_amplitude,
             },
+            water_current: (0.0, 0.0),
         }
     }
 }

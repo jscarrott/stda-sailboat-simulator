@@ -59,7 +59,21 @@ impl<'a> System<f64, State> for OdeContext<'a> {
             (env.rudder_angle, env.sail_angle)
         };
 
-        let speed = (vel_x * vel_x + vel_y * vel_y).sqrt();
+        // (Hydrodynamic forces below use the through-water speed, not
+        // the ground speed, so no separate ground-speed term is needed.)
+        // Tidal current, rotated from the global frame into body axes.
+        // Hydrodynamic forces act on the velocity of the hull *through
+        // the water*, so subtract the current; aerodynamic (apparent
+        // wind) and the position/Coriolis terms keep the ground-frame
+        // velocity, since the air and the boat's momentum don't move
+        // with the water.
+        let (cur_e, cur_n) = env.water_current;
+        let cur_bx = cur_e * yaw.cos() + cur_n * yaw.sin();
+        let cur_by = -cur_e * yaw.sin() + cur_n * yaw.cos();
+        let vrw_x = vel_x - cur_bx;
+        let vrw_y = vel_y - cur_by;
+        let water_speed = (vrw_x * vrw_x + vrw_y * vrw_y).sqrt();
+
         let wave_influence = calculate_wave_influence(pos_x, pos_y, yaw, env.wave, time, cfg.environment.gravity);
         let apparent_wind = calculate_apparent_wind(yaw, vel_x, vel_y, env.true_wind);
 
@@ -71,12 +85,15 @@ impl<'a> System<f64, State> for OdeContext<'a> {
         // gybe-slam oscillation.) See autopilot::route::next_sail_side.
         let true_sail_angle = sail_angle;
 
-        let damping = calculate_damping(vel_x, vel_y, vel_z, roll_rate, pitch_rate, yaw_rate, inv);
+        // Hull-drag / keel / rudder / wave-making forces use the
+        // through-water velocity; angular and heave dampings are
+        // unaffected by a uniform horizontal current.
+        let damping = calculate_damping(vrw_x, vrw_y, vel_z, roll_rate, pitch_rate, yaw_rate, inv);
         let (hydrostatic_force, x_hs, y_hs) = calculate_hydrostatic_force(pos_z, roll, pitch, wave_influence, inv);
-        let wave_impedance = calculate_wave_impedance(vel_x, speed, cfg.boat.hull_speed, inv);
-        let rudder_force = calculate_rudder_force(speed, rudder_angle, &cfg.environment, &cfg.boat);
+        let wave_impedance = calculate_wave_impedance(vrw_x, water_speed, cfg.boat.hull_speed, inv);
+        let rudder_force = calculate_rudder_force(water_speed, rudder_angle, &cfg.environment, &cfg.boat);
         let (lateral_force, lateral_separation) =
-            calculate_lateral_force(vel_x, vel_y, roll, speed, &cfg.environment, &cfg.boat);
+            calculate_lateral_force(vrw_x, vrw_y, roll, water_speed, &cfg.environment, &cfg.boat);
         let sail_force = calculate_sail_force(roll, apparent_wind, true_sail_angle, &cfg.environment, &cfg.boat);
 
         let delta_pos_x = vel_x * yaw.cos() - vel_y * yaw.sin();
@@ -251,6 +268,7 @@ mod tests {
                     direction: fx.env.wave_direction,
                     amplitude: fx.env.wave_amplitude,
                 },
+                water_current: (0.0, 0.0),
             };
             y[SAIL_STATE] = side * fx.state[SAIL_STATE].abs();
             let ctx = OdeContext { cfg: &cfg, inv: &inv, env, actor_dynamics: true };
