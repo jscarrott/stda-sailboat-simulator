@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ode_solvers::Dopri5;
+use ode_solvers::{Dopri5, Rk4};
 
 use crate::autopilot::{Autopilot, Observation, WindReading};
 use crate::config::{Config, Invariants};
@@ -9,6 +9,20 @@ use crate::physics::solve::{
 };
 use crate::state::*;
 use crate::wind_model::WindModel;
+
+/// Which inner ODE method to use per outer control step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Solver {
+    /// Adaptive Dormand-Prince 5(4). Higher accuracy per step, but
+    /// fails out with `StiffnessDetected` on aggressive IOM dynamics.
+    Dopri5,
+    /// Fixed-step classical RK4. Lower accuracy per step, no stiffness
+    /// check — useful when Dopri5 bails on long runs with heavy gusts.
+    /// Uses substeps of `RK4_SUBSTEP` seconds within each outer step.
+    Rk4,
+}
+
+const RK4_SUBSTEP: f64 = 0.01;
 
 #[derive(Debug)]
 pub struct SimResult {
@@ -59,6 +73,7 @@ pub fn simulate(
     n_steps: usize,
     x0: State,
     _actor_dynamics: bool,
+    solver: Solver,
 ) -> Result<SimResult> {
     let mut result = SimResult {
         t: Vec::with_capacity(n_steps + 1),
@@ -130,18 +145,29 @@ pub fn simulate(
         result.sail.push(actuator_sail);
 
         let ctx = OdeContext { cfg, inv, env, actor_dynamics: false };
-        // Looser tolerances than the 1e-6/1e-9 used during Python parity:
-        // the IOM hull has fast pitch and roll modes (T~0.25 s, 1.3 s)
-        // that Dopri5 can integrate through but its stiffness detector
-        // would flag at tight tolerances. We've slew-limited commands
-        // and pulled actuators out of the ODE state, so the remaining
-        // physics is the actual continuous-time system; trading some
-        // per-step accuracy here keeps the run from bailing out.
-        let mut stepper = Dopri5::new(ctx, t, t + sampletime, 0.01, x, 1e-4, 1e-7);
-        stepper
-            .integrate()
-            .map_err(|e| anyhow::anyhow!("dopri5 step at t={}: {:?}", t, e))?;
-        x = *stepper.y_out().last().expect("dopri5 produces at least one output");
+        x = match solver {
+            Solver::Dopri5 => {
+                // Looser tolerances than the 1e-6/1e-9 used during
+                // Python parity: the IOM has fast pitch and roll modes
+                // (T ~0.25 s, 1.3 s) that Dopri5 can step through but
+                // its stiffness detector would flag at tight tolerances.
+                let mut stepper = Dopri5::new(ctx, t, t + sampletime, 0.01, x, 1e-4, 1e-7);
+                stepper
+                    .integrate()
+                    .map_err(|e| anyhow::anyhow!("dopri5 step at t={}: {:?}", t, e))?;
+                *stepper.y_out().last().expect("dopri5 produces at least one output")
+            }
+            Solver::Rk4 => {
+                // No adaptive step, no stiffness check — just grind
+                // through with 30 substeps per outer step. Trades
+                // accuracy for robustness on stiff transients.
+                let mut stepper = Rk4::new(ctx, t, x, t + sampletime, RK4_SUBSTEP);
+                stepper
+                    .integrate()
+                    .map_err(|e| anyhow::anyhow!("rk4 step at t={}: {:?}", t, e))?;
+                *stepper.y_out().last().expect("rk4 produces at least one output")
+            }
+        };
         t += sampletime;
 
         // Slots 12/13 are unused with actor_dynamics=false; overwrite

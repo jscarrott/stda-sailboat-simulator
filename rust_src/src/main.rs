@@ -23,7 +23,7 @@ use std::path::PathBuf;
 
 use config::Config;
 use route::WindOverride;
-use scenario::{scenario_route, WindVariance};
+use scenario::{scenario_route, Solver, WindVariance};
 
 #[derive(Parser, Debug)]
 #[command(name = "sailboat_sim", version, about = "6-DOF sailboat simulator")]
@@ -78,6 +78,12 @@ struct Cli {
     #[arg(long, default_value_t = 0xC0FFEE_u64)]
     wind_seed: u64,
 
+    /// Inner ODE solver: `dopri5` (adaptive, accurate, may fail with
+    /// StiffnessDetected on aggressive IOM dynamics) or `rk4`
+    /// (fixed-step, no stiffness check, trades accuracy for robustness).
+    #[arg(long, default_value = "dopri5")]
+    solver: String,
+
     /// Override the output PNG path. Defaults to `figs/route_<name>.png`.
     #[arg(long)]
     out: Option<PathBuf>,
@@ -104,6 +110,11 @@ fn main() -> Result<()> {
                 correlation_time_s: cli.wind_time_constant,
                 seed: cli.wind_seed,
             };
+            let solver = match cli.solver.as_str() {
+                "dopri5" => Solver::Dopri5,
+                "rk4" => Solver::Rk4,
+                other => bail!("unknown --solver {other:?}; supported: dopri5, rk4"),
+            };
             let run = scenario_route(
                 &cfg,
                 route_path,
@@ -111,6 +122,7 @@ fn main() -> Result<()> {
                 cli.max_run_time_s,
                 wind_override,
                 Some(variance),
+                solver,
             )?;
             let out = cli.out.unwrap_or_else(|| {
                 PathBuf::from(format!("figs/route_{}.png", run.route.name))
