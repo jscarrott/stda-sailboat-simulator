@@ -106,11 +106,15 @@ simulator: {
         vel_y: 0,
         vel_z: 0,
 
-        yaw:   0.5,                     # ~29°; deliberately off-axis from
-                                         # any cardinal wind direction so
-                                         # the dead-downwind sign-flip
-                                         # singularity in solve()'s sail
-                                         # convention doesn't fire at t=0.
+        yaw:   0.5,                     # ~29°; off-axis from cardinal
+                                         # wind directions. solve()'s
+                                         # tanh sail-sign smoothing
+                                         # handles dead-downwind, but
+                                         # exact-beam (apparent ±π/2)
+                                         # combined with full-throw
+                                         # actuator dynamics can still
+                                         # trip Dopri5's stiffness
+                                         # detector. Off-axis dodges it.
         pitch: 0,
         roll:  0,
 
