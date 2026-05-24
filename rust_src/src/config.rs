@@ -8,6 +8,20 @@ pub struct Config {
     pub boat: BoatCfg,
     pub environment: EnvCfg,
     pub simulator: SimCfg,
+    /// LQR-derived heading controller gains. Optional; if absent the
+    /// controller falls back to the 4 m hull's hand-tuned defaults
+    /// (kp=0.5, ki=0.1, kd=0.9). Regenerate with
+    /// `scripts/compute_controller_gains.py <this-yaml>` whenever
+    /// yaw_timeconstant or the Q/r weights change.
+    #[serde(default)]
+    pub controller_gains: Option<ControllerGains>,
+}
+
+#[derive(Deserialize, Debug, Clone, Copy)]
+pub struct ControllerGains {
+    pub kp: f64,
+    pub ki: f64,
+    pub kd: f64,
 }
 
 #[derive(Deserialize, Debug)]

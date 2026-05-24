@@ -83,6 +83,19 @@ environment: {
     gravity:              9.81
 }
 
+# LQR gains derived from yaw_timeconstant=3.0 with control-effort-
+# weighted weights Q=diag(0.1, 5.0, 0.3), r=300. The high r penalises
+# rudder activity so the controller doesn't excite the lightly-damped
+# heel mode of the IOM. The Python defaults (r=30, q_yawrate=1)
+# produced gains that destabilised the integrator on this hull.
+# Regenerate via:
+#   poetry run python scripts/compute_controller_gains.py \
+#       sim_params_iom.yaml --q-yawrate 5 --r 300
+controller_gains:
+  kp: 0.235364
+  ki: 0.031623
+  kd: 0.458831
+
 simulator: {
     stepper: {
         stepsize:   0.1,
