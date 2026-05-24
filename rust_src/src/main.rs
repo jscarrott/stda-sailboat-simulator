@@ -1,66 +1,71 @@
-// Phase 1 scaffolding: many items below are not yet wired up. Remove this
-// allow as soon as Phase 2/3 connect them.
+// Several YAML fields (latitude/longitude, stepper.{stepsize,clockrate},
+// sail/keel/rudder geometry not in the active force model) and a few
+// public methods on RouteFollower are kept for future scenarios and
+// for debugging — silence the unused warnings rather than littering
+// the modules with per-item allows.
 #![allow(dead_code)]
 
 mod config;
 mod controller;
 mod physics;
+mod plot;
 mod route;
 mod sail;
+mod scenario;
 mod state;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
 use std::path::PathBuf;
 
-use config::{Config, Invariants};
-use route::Route;
+use config::Config;
+use scenario::scenario_route;
 
 #[derive(Parser, Debug)]
 #[command(name = "sailboat_sim", version, about = "6-DOF sailboat simulator")]
 struct Cli {
-    #[arg(long, default_value = "scenario_1")]
+    /// Which scenario to run.
+    #[arg(long, default_value = "route")]
     scenario: String,
 
+    /// Simulator parameter config.
     #[arg(long, default_value = "sim_params_config.yaml")]
     config: PathBuf,
 
+    /// Route YAML (required when --scenario route).
     #[arg(long)]
     route: Option<PathBuf>,
+
+    /// Override the output PNG path. Defaults to `figs/route_<name>.png`.
+    #[arg(long)]
+    out: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let cfg = Config::load(&cli.config)?;
-    let inv = Invariants::from_config(&cfg);
 
-    println!("loaded {}", cli.config.display());
-    println!(
-        "  boat: mass={} kg, length={} m, sail_area={} m^2",
-        cfg.boat.mass, cfg.boat.length, cfg.boat.sail.area
-    );
-    println!(
-        "  env:  water_density={} kg/m^3, gravity={} m/s^2",
-        cfg.environment.water_density, cfg.environment.gravity
-    );
-    println!(
-        "  init: wind {} m/s from {} deg",
-        cfg.simulator.initial.wind_strength, cfg.simulator.initial.wind_direction
-    );
-    println!(
-        "  invariants: gravity_force={:.4} N, wave_impedance={:.4}",
-        inv.gravity_force, inv.wave_impedance
-    );
-    if let Some(route_path) = &cli.route {
-        let r = Route::load(route_path)?;
-        println!(
-            "route {}: {} waypoints, acceptance_radius={} m, close_hauled={}°",
-            r.name,
-            r.waypoints.len(),
-            r.acceptance_radius,
-            r.close_hauled_angle_deg
-        );
+    match cli.scenario.as_str() {
+        "route" => {
+            let route_path = cli
+                .route
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("--route <path> is required for --scenario route"))?;
+            let run = scenario_route(&cfg, route_path)?;
+            let out = cli.out.unwrap_or_else(|| {
+                PathBuf::from(format!("figs/route_{}.png", run.route.name))
+            });
+            println!(
+                "{}: simulated {:.1} s across {} steps ({} states recorded)",
+                run.route.name,
+                run.result.t.last().copied().unwrap_or(0.0),
+                run.result.rudder.len(),
+                run.result.x.len()
+            );
+            plot::plot_trajectory(&run.result, Some(&run.route), &out)?;
+            println!("wrote {}", out.display());
+        }
+        other => bail!("unknown scenario {other:?}; supported: route"),
     }
-    println!("scenario={} route={:?}", cli.scenario, cli.route);
     Ok(())
 }

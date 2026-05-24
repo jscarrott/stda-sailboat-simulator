@@ -4,9 +4,12 @@ close_hauled_angle_deg: 45.0
 xte_lookahead: 15.0
 min_tack_duration_s: 3.0
 
-# Beam reach for all three legs — no tacking should fire.
+# Math-coords direction the wind BLOWS TOWARD. 270° (= south) means
+# wind comes from the north. With this wind the first leg (due north)
+# runs directly upwind and triggers tacking; the second and third
+# legs are reaching/downwind and steer direct.
 wind:
-  direction_deg: 270.0   # wind from the west, blowing east
+  direction_deg: 270.0
   speed: 5.0
 
 waypoints:

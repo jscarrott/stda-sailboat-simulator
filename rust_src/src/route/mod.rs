@@ -12,6 +12,12 @@ pub struct Waypoint {
     pub y: f64,
 }
 
+/// Wind override matching the Python `sim_params_config.yaml`
+/// convention: `direction_deg` is the *math-coords* angle of the wind
+/// **velocity vector**, i.e. the direction the wind is blowing TOWARD
+/// (0° = +x, 90° = +y). The reciprocal — the direction the wind comes
+/// from — is `direction_deg + 180`. To produce a leg directly upwind,
+/// set `direction_deg` to the bearing of the leg + 180°.
 #[derive(Deserialize, Clone, Copy, Debug)]
 pub struct WindOverride {
     pub direction_deg: f64,
