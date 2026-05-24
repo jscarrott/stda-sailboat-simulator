@@ -1,0 +1,45 @@
+name: ilfracombe_to_lundy
+acceptance_radius: 150.0
+close_hauled_angle_deg: 45.0
+xte_lookahead: 100.0
+min_tack_duration_s: 30.0
+
+# Tangent-plane local metres, origin 51.1735°N 4.6680°W (centre of Lundy).
+# Chart: charts/north_devon.json. Mainland coastline runs east of x≈28 km;
+# Ilfracombe harbour mouth sits at roughly (38900, 4000). Lundy spans
+# x ∈ [-880, 1040], y ∈ [-1671, 3230]. Waypoints keep ≥400 m off the rocks.
+#
+# Prevailing wind in the Bristol Channel is from the SW (math direction
+# 45° → velocity vector points NE, i.e. wind FROM 225° in compass terms).
+# Round-trip leg breakdown under this wind:
+#   Outbound (heading ~W):     close reach to beam reach
+#   Lundy north → south:       broad reach
+#   Lundy south → east:        run
+#   Lundy east → north:        close hauled / beat
+#   Return (heading ~E):       broad reach to run
+wind:
+  direction_deg: 45.0
+  speed: 6.0
+
+waypoints:
+  # Outbound passage from Ilfracombe
+  - { x: 38900.0, y:  4100.0 }    # 1. Ilfracombe harbour mouth (start)
+  - { x: 38000.0, y:  5500.0 }    # 2. Clear Capstone Point to the NW
+  - { x: 25000.0, y:  5200.0 }    # 3. Mid-channel, north of Bull Point
+  - { x: 10000.0, y:  4500.0 }    # 4. Approaching Lundy from the east
+  - { x:  3000.0, y:  3800.0 }    # 5. Lundy NE corner, begin circumnav
+  # Counter-clockwise circumnavigation of Lundy
+  - { x: -1000.0, y:  3600.0 }    # 6. NW past the north tip
+  - { x: -1300.0, y:  1500.0 }    # 7. West side
+  - { x: -1300.0, y: -1500.0 }    # 8. SW corner
+  - { x:   400.0, y: -2100.0 }    # 9. South of South Light
+  - { x:  1500.0, y: -1500.0 }    # 10. SE corner
+  - { x:  2000.0, y:  1500.0 }    # 11. East side
+  - { x:  3000.0, y:  3800.0 }    # 12. Close the circumnav at the NE corner
+  # Return passage to Ilfracombe
+  - { x: 10000.0, y:  4500.0 }    # 13. Re-enter the channel
+  - { x: 25000.0, y:  5200.0 }    # 14. Mid-channel
+  - { x: 38000.0, y:  5500.0 }    # 15. Approach Ilfracombe
+  - { x: 38900.0, y:  4100.0 }    # 16. Harbour mouth (finish)
+
+loop: false
