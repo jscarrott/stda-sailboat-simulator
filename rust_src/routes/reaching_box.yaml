@@ -1,0 +1,21 @@
+name: reaching_box
+acceptance_radius: 10.0
+close_hauled_angle_deg: 40.0
+xte_lookahead: 15.0
+min_tack_duration_s: 10.0
+
+# A course with NO upwind legs when the wind is from the east
+# (run with --wind-deg 180). Every leg is a beam reach or a run:
+#   (0,0)->(0,100)    heading N   : beam reach
+#   (0,100)->(-100,100) heading W : dead downwind run
+#   (-100,100)->(-100,0) heading S: beam reach
+# Used to show the controller / route follower / solver all work end
+# to end; isolates the separate "can't beat to windward" limitation
+# of the current IOM parameters.
+waypoints:
+  - { x:    0.0, y:    0.0 }
+  - { x:    0.0, y:  100.0 }
+  - { x: -100.0, y:  100.0 }
+  - { x: -100.0, y:    0.0 }
+
+loop: false
