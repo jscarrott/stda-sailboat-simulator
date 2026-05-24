@@ -9,8 +9,23 @@ use crate::physics::wave::{calculate_wave_impedance, calculate_wave_influence};
 use crate::physics::wind::calculate_apparent_wind;
 use crate::state::*;
 
-const MAX_RUDDER_SPEED: f64 = std::f64::consts::PI / 30.0;
-const MAX_SAIL_SPEED: f64 = std::f64::consts::PI / 10.0;
+/// Mechanical slew limits for the actuators. Numbers picked to mimic a
+/// hobby-grade rudder servo and a drum-style sail winch; the runner in
+/// `scenario::simulate` uses these as the cap when slew-limiting
+/// autopilot commands so the integrator never sees a step in the
+/// applied actuator angle larger than the hardware can deliver.
+pub const MAX_RUDDER_SPEED: f64 = std::f64::consts::PI / 30.0;
+pub const MAX_SAIL_SPEED: f64 = std::f64::consts::PI / 10.0;
+
+/// First-order rate constants (1/s) for the rudder and sail-winch
+/// actuators. `state_rate = -RATE · (state − command)` has time
+/// constant τ = 1/RATE. The runner uses these constants to step the
+/// actuator state analytically between outer control ticks (see
+/// `scenario::simulate`) rather than letting Dopri5 chase the fast
+/// rudder mode — that was driving the integrator into stiffness on
+/// long IOM runs even with the sign-smoothing fix in place.
+pub const RUDDER_RATE: f64 = 2.0;
+pub const SAIL_RATE: f64 = 0.1;
 
 /// Half-width of the smoothed dead-downwind transition, in radians.
 /// `sign(apparent_wind.angle)` flips between ±1 abruptly across angle=0,
@@ -126,8 +141,10 @@ impl<'a> System<f64, State> for OdeContext<'a> {
         dy[YAW_RATE] = delta_yaw_rate;
 
         if self.actor_dynamics {
-            let delta_rudder = (-2.0 * (rudder_angle - env.rudder_angle)).clamp(-MAX_RUDDER_SPEED, MAX_RUDDER_SPEED);
-            let delta_sail = (-0.1 * (sail_angle - env.sail_angle)).clamp(-MAX_SAIL_SPEED, MAX_SAIL_SPEED);
+            let delta_rudder = (-RUDDER_RATE * (rudder_angle - env.rudder_angle))
+                .clamp(-MAX_RUDDER_SPEED, MAX_RUDDER_SPEED);
+            let delta_sail = (-SAIL_RATE * (sail_angle - env.sail_angle))
+                .clamp(-MAX_SAIL_SPEED, MAX_SAIL_SPEED);
             dy[RUDDER_STATE] = delta_rudder;
             dy[SAIL_STATE] = delta_sail;
         } else {
