@@ -4,7 +4,9 @@ use ode_solvers::Dopri5;
 use crate::autopilot::{Autopilot, Observation, WindReading};
 use crate::config::{Config, Invariants};
 use crate::physics::forces::Environment;
-use crate::physics::solve::OdeContext;
+use crate::physics::solve::{
+    OdeContext, MAX_RUDDER_SPEED, MAX_SAIL_SPEED, RUDDER_RATE, SAIL_RATE,
+};
 use crate::state::*;
 use crate::wind_model::WindModel;
 
@@ -16,16 +18,37 @@ pub struct SimResult {
     pub sail: Vec<f64>,
 }
 
+/// Move `current` toward `target` by at most `max_delta`.
+fn slew(current: f64, target: f64, max_delta: f64) -> f64 {
+    let delta = target - current;
+    if delta.abs() <= max_delta {
+        target
+    } else {
+        current + delta.signum() * max_delta
+    }
+}
+
 /// Run the outer control loop and inner ODE integration.
 ///
-/// Each outer step at `sampletime` the runner:
-///   1. Builds an `Observation` from the current state + environment.
-///   2. Calls `autopilot.step(obs)` to get actuator commands.
-///   3. Writes the commands into the environment and integrates one
-///      step with Dopri5.
+/// Per outer step at `sampletime`:
+///   1. Refresh the wind from the `WindModel`.
+///   2. Build an `Observation` and ask the `Autopilot` for a `Command`.
+///   3. **Slew-limit** the commanded rudder/sail angles to the
+///      actuators' mechanical max-rates so the controller can never
+///      ask for a step the hardware couldn't deliver.
+///   4. **Step the actuator state analytically** as a first-order lag
+///      toward the slewed command, using the closed-form
+///      `x ← target + (x − target)·exp(−rate·dt)`. This used to live
+///      inside the ODE state vector but the fast rudder mode (τ=0.5 s)
+///      kept tripping Dopri5's stiffness detector on long runs. Pulling
+///      it out makes the remaining 12-DOF physics system non-stiff.
+///   5. Integrate the physics for one step with `actor_dynamics=false`
+///      so the ODE reads the current actuator state from `env`.
 ///
-/// The sim has no knowledge of what kind of autopilot it is — same
-/// trait will be driven from real hardware sensors / servos.
+/// State slots 12 (RUDDER_STATE) and 13 (SAIL_STATE) are kept in the
+/// SimResult record so downstream plotters / fixtures see the same
+/// schema, but they are now written by the analytic update rather than
+/// by the ODE itself.
 pub fn simulate(
     cfg: &Config,
     inv: &Invariants,
@@ -35,7 +58,7 @@ pub fn simulate(
     sampletime: f64,
     n_steps: usize,
     x0: State,
-    actor_dynamics: bool,
+    _actor_dynamics: bool,
 ) -> Result<SimResult> {
     let mut result = SimResult {
         t: Vec::with_capacity(n_steps + 1),
@@ -55,9 +78,20 @@ pub fn simulate(
     result.t.push(t);
     result.x.push(to_array(&x));
 
+    // Actuator state, tracked externally to the ODE so the integrator
+    // never sees the fast first-order rudder mode.
+    let mut actuator_rudder = x[RUDDER_STATE];
+    let mut actuator_sail = x[SAIL_STATE];
+    // Slew-limited command target carried between ticks.
+    let mut cmd_rudder = env.rudder_angle;
+    let mut cmd_sail = env.sail_angle;
+
+    let max_d_rudder = MAX_RUDDER_SPEED * sampletime;
+    let max_d_sail = MAX_SAIL_SPEED * sampletime;
+    let alpha_rudder = (-RUDDER_RATE * sampletime).exp();
+    let alpha_sail = (-SAIL_RATE * sampletime).exp();
+
     for _ in 0..n_steps {
-        // Refresh the wind once per outer step. For constant wind this
-        // is a no-op; for Ornstein–Uhlenbeck it integrates a gust step.
         env.true_wind = wind.sample(t, sampletime);
 
         let obs = Observation {
@@ -75,23 +109,45 @@ pub fn simulate(
             },
         };
 
-        let cmd = autopilot.step(&obs);
-        if cmd.mission_complete {
+        let raw_cmd = autopilot.step(&obs);
+        if raw_cmd.mission_complete {
             break;
         }
-        env.rudder_angle = cmd.rudder_angle;
-        env.sail_angle = cmd.sail_angle;
 
-        result.rudder.push(env.rudder_angle);
-        result.sail.push(env.sail_angle);
+        // (1) Slew-limit the new commands.
+        cmd_rudder = slew(cmd_rudder, raw_cmd.rudder_angle, max_d_rudder);
+        cmd_sail = slew(cmd_sail, raw_cmd.sail_angle, max_d_sail);
 
-        let ctx = OdeContext { cfg, inv, env, actor_dynamics };
-        let mut stepper = Dopri5::new(ctx, t, t + sampletime, 0.01, x, 1e-6, 1e-9);
+        // (2) Analytic first-order actuator step toward the slewed cmd.
+        actuator_rudder = cmd_rudder + (actuator_rudder - cmd_rudder) * alpha_rudder;
+        actuator_sail = cmd_sail + (actuator_sail - cmd_sail) * alpha_sail;
+
+        // Hand the actuator state to the ODE through env.
+        env.rudder_angle = actuator_rudder;
+        env.sail_angle = actuator_sail;
+
+        result.rudder.push(actuator_rudder);
+        result.sail.push(actuator_sail);
+
+        let ctx = OdeContext { cfg, inv, env, actor_dynamics: false };
+        // Looser tolerances than the 1e-6/1e-9 used during Python parity:
+        // the IOM hull has fast pitch and roll modes (T~0.25 s, 1.3 s)
+        // that Dopri5 can integrate through but its stiffness detector
+        // would flag at tight tolerances. We've slew-limited commands
+        // and pulled actuators out of the ODE state, so the remaining
+        // physics is the actual continuous-time system; trading some
+        // per-step accuracy here keeps the run from bailing out.
+        let mut stepper = Dopri5::new(ctx, t, t + sampletime, 0.01, x, 1e-4, 1e-7);
         stepper
             .integrate()
             .map_err(|e| anyhow::anyhow!("dopri5 step at t={}: {:?}", t, e))?;
         x = *stepper.y_out().last().expect("dopri5 produces at least one output");
         t += sampletime;
+
+        // Slots 12/13 are unused with actor_dynamics=false; overwrite
+        // them so the SimResult reflects the analytic actuator state.
+        x[RUDDER_STATE] = actuator_rudder;
+        x[SAIL_STATE] = actuator_sail;
 
         result.t.push(t);
         result.x.push(to_array(&x));
