@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>stda-sailboat-simulator: hardware retrofit plan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #fafaf7;
+    --fg: #1c1c1c;
+    --muted: #555;
+    --accent: #1a4d6b;
+    --sea: #ebf5fc;
+    --land: #e1d7be;
+    --rule: #d8d4c4;
+    --code-bg: #f1ede0;
+  }
+  html { background: var(--bg); color: var(--fg); }
+  body {
+    max-width: 860px;
+    margin: 2.5rem auto;
+    padding: 0 1.5rem 4rem;
+    font: 16px/1.55 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  }
+  h1 { font-size: 2rem; margin: 0 0 .25rem; }
+  h1 + .sub { color: var(--muted); margin: 0 0 2rem; }
+  h2 {
+    margin-top: 2.6rem; padding-bottom: .3rem;
+    border-bottom: 1px solid var(--rule);
+    font-size: 1.4rem; color: var(--accent);
+  }
+  h3 { margin-top: 1.6rem; font-size: 1.1rem; }
+  figure { margin: 1.5rem 0; text-align: center; }
+  figure img { max-width: 100%; border: 1px solid var(--rule); border-radius: 4px; }
+  figcaption { color: var(--muted); font-size: .9rem; margin-top: .4rem; }
+  code, pre, kbd { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: .92em; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+  pre { background: var(--code-bg); padding: .8rem 1rem; border-radius: 4px; overflow-x: auto; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 1rem 0;
+    font-size: .95rem;
+  }
+  th, td {
+    text-align: left; padding: .55rem .8rem;
+    border-bottom: 1px solid var(--rule); vertical-align: top;
+  }
+  th { background: var(--code-bg); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill {
+    display: inline-block; padding: 2px 9px; border-radius: 999px;
+    font-size: .78rem; font-weight: 600; letter-spacing: .02em;
+  }
+  .pill.done { background: #d6ebd9; color: #1b5524; }
+  .pill.now  { background: #fde8c2; color: #6a4400; }
+  .pill.next { background: #d3dff0; color: #1a3f74; }
+  .pill.stretch { background: #f0d0d0; color: #6a1818; }
+  .callout {
+    background: var(--sea); border-left: 3px solid var(--accent);
+    padding: .9rem 1.1rem; border-radius: 0 4px 4px 0;
+    margin: 1.2rem 0;
+  }
+  .footer {
+    margin-top: 3rem; padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted); font-size: .85rem;
+  }
+  ul.dense li { margin-bottom: .2rem; }
+</style>
+</head>
+<body>
+
+<h1>Autonomous Lundy passage &mdash; project plan</h1>
+<p class="sub">A 1&nbsp;m RC sailing hull retrofitted with the autopilot we just ported to Rust, building toward an unattended crossing from Ilfracombe to Lundy Island. Last updated <span id="d"></span>.</p>
+
+<h2>What we have</h2>
+
+<ul>
+  <li><strong>6-DOF Rust simulator</strong>, ported from Simon Kohaut's Python. Force model, ODE integration (Dopri5), heading controller (PID/LQR), sail-trim optimiser, route follower.</li>
+  <li><strong>Cached coastline chart</strong> for Lundy + the North Devon coast (Saunton &rarr; Heddon's Mouth), fetched from OpenStreetMap and projected to a tangent-plane local metre frame centred on the island.</li>
+  <li><strong>Two reference routes</strong>: a Lundy circumnavigation and the full Ilfracombe round-trip shown below.</li>
+  <li><strong>Autopilot trait</strong> separating the control stack from the sim &mdash; the same <code>RouteAutopilot</code> code will run unchanged on hardware once a sensor/servo runner is written.</li>
+</ul>
+
+<figure>
+  <img src="../rust_src/figs/route_ilfracombe_to_lundy.png" alt="Simulated boat track from Ilfracombe round Lundy and back, on a chart showing the Devon coastline and Lundy Island.">
+  <figcaption>16-waypoint round trip simulated under a SW 6&nbsp;m/s wind. ~95&nbsp;km, 13&nbsp;h sim time.</figcaption>
+</figure>
+
+<h2>The seam between control and world</h2>
+
+<p>Every outer control tick the runner builds an <code>Observation</code> and hands it to <code>autopilot.step(obs)</code>, which returns a <code>Command</code>. Neither side knows whether the other is sim or hardware:</p>
+
+<pre>pub trait Autopilot {
+    fn step(&amp;mut self, obs: &amp;Observation) -&gt; Command;
+    fn reset(&amp;mut self) {}
+}</pre>
+
+<table>
+<thead><tr><th>Observation field</th><th>Sim source</th><th>Hardware source</th></tr></thead>
+<tbody>
+<tr><td><code>pos_x</code>, <code>pos_y</code></td><td>state vector</td><td>GPS fix &rarr; tangent-plane projection</td></tr>
+<tr><td><code>heading</code></td><td><code>state[YAW]</code></td><td>tilt-compensated compass (BNO055)</td></tr>
+<tr><td><code>yaw_rate</code>, <code>roll</code></td><td><code>state[YAW_RATE]</code>, <code>state[ROLL]</code></td><td>IMU</td></tr>
+<tr><td><code>vel_x_body</code>, <code>vel_y_body</code></td><td><code>state[VEL_X]</code>, <code>state[VEL_Y]</code></td><td>GPS ground velocity rotated by heading</td></tr>
+<tr><td><code>true_wind</code></td><td>environment</td><td>apparent-wind vane/anemometer + boat course</td></tr>
+</tbody>
+</table>
+
+<h2>Hull: second-hand 1&nbsp;m IOM</h2>
+
+<p>The <strong>International One Metre</strong> class is the most popular RC sailing class in the UK and is well-suited to retrofit:</p>
+
+<ul class="dense">
+  <li>1000&nbsp;mm LOA, ~4&nbsp;kg displacement, deep bulb keel &rarr; self-rights from a knockdown.</li>
+  <li>Three standard rigs (A, B, C) for different wind ranges; you swap rigs, not boats.</li>
+  <li>Already designed to carry rudder servo + sail winch + receiver, so hardpoints exist.</li>
+  <li>Active second-hand market via UK MYA clubs, eBay, Facebook Marketplace &mdash; older hulls (Italiko, Triple Crown, TS2, Goth) routinely change hands for &pound;50&ndash;&pound;200.</li>
+</ul>
+
+<h3>What to check on a used hull</h3>
+<ul class="dense">
+  <li><strong>Hull integrity</strong>: no cracks at the keel box, no soft spots, deck patch repairs OK if dry.</li>
+  <li><strong>Rig included</strong>: at least one set of A rig (mast, boom, jib boom, sails). Replacements are pricey.</li>
+  <li><strong>Servo bay watertight</strong>: gasketed hatch is essential for coastal trials.</li>
+  <li><strong>Sail winch</strong>: a drum-style winch (RMG, Hitec HS-785HB) is much better than an arm servo for autonomy &mdash; smoother and full range.</li>
+  <li><strong>Keel bulb intact</strong>: this is the self-righting moment; chipped/cracked bulbs leak lead.</li>
+</ul>
+
+<div class="callout">
+<strong>Honest scoping.</strong> An IOM is a pond/lake racer. With good weather windows and a chase kayak it can do sheltered coastal trials (Ilfracombe inner harbour, Combe Martin bay, the inside of Hartland Point), but the full ~30&nbsp;km open-water passage to Lundy is a stretch goal that may want a bigger hull in the end. The sim work, the autopilot, the electronics &mdash; all of it carries straight across to a larger boat later. Treat the IOM as the platform that gets the control stack debugged.
+</div>
+
+<h2>Electronics BOM</h2>
+
+<table>
+<thead><tr><th>Component</th><th>Suggested part</th><th>~&pound;</th></tr></thead>
+<tbody>
+<tr><td>Microcontroller</td><td>RPi Pico W (CircuitPython/Rust) <em>or</em> RPi Zero 2 W (runs the existing Rust autopilot crate unmodified)</td><td class="num">7&ndash;20</td></tr>
+<tr><td>GPS</td><td>u-blox NEO-M9N module</td><td class="num">25</td></tr>
+<tr><td>IMU + compass</td><td>BNO055 (built-in sensor fusion, gives heading/roll/yaw-rate directly)</td><td class="num">20</td></tr>
+<tr><td>Wind direction/speed</td><td>DIY: hall-effect cup anemometer + reed-switch vane <em>or</em> Calypso Ultrasonic Portable</td><td class="num">20&ndash;500</td></tr>
+<tr><td>Sail winch servo</td><td>Existing RMG or Hitec HS-785HB on the boat</td><td class="num">&mdash;</td></tr>
+<tr><td>Rudder servo</td><td>Existing on the boat</td><td class="num">&mdash;</td></tr>
+<tr><td>Battery</td><td>2S 2000&nbsp;mAh LiFePO4 (safer in a flooded hull than LiPo)</td><td class="num">25</td></tr>
+<tr><td>Telemetry / failsafe RC</td><td>FrSky/ELRS receiver kept on board for manual override + RSSI</td><td class="num">30</td></tr>
+<tr><td>Long-range data link <em>(coastal only)</em></td><td>LoRa 868&nbsp;MHz pair, or Iridium SBD modem for offshore</td><td class="num">40&ndash;300</td></tr>
+</tbody>
+</table>
+
+<p>Total realistic spend for a pond/lake-capable retrofit: <strong>&pound;150 + the hull</strong>. Coastal capability adds the long-range link.</p>
+
+<h2>Phased plan</h2>
+
+<table>
+<thead><tr><th></th><th>Phase</th><th>Goal</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td><span class="pill done">done</span></td><td>0. Sim parity</td><td>Rust port matches Python traces on controller, sail, ODE.</td><td>laptop</td></tr>
+<tr><td><span class="pill done">done</span></td><td>1. Route &amp; chart</td><td>OSM coastline cached; Ilfracombe round trip plans cleanly in sim.</td><td>laptop</td></tr>
+<tr><td><span class="pill done">done</span></td><td>2. Trait boundary</td><td>Sim and autopilot decoupled; trait is dyn-compatible.</td><td>laptop</td></tr>
+<tr><td><span class="pill now">now</span></td><td>3. Source hull</td><td>Buy a used IOM with at least A rig. Inspect for keel/seal damage.</td><td>UK marketplace</td></tr>
+<tr><td><span class="pill next">next</span></td><td>4. Hardware runner</td><td>Write a sibling to <code>simulate()</code> that reads GPS+IMU+wind over I&sup2;C/UART and drives servos via PWM. Feeds the same <code>Observation</code>/<code>Command</code> as the sim.</td><td>workbench</td></tr>
+<tr><td><span class="pill next">next</span></td><td>5. Faked-GPS HiL</td><td>Replay sim-generated Observations into the real MCU; verify servos move as the sim's recorded commands say they should. No water yet.</td><td>workbench</td></tr>
+<tr><td><span class="pill next">next</span></td><td>6. Pond shakedown</td><td>Manual launch with RC failsafe armed. Tune controller gains against real boat dynamics.</td><td>any pond / Roadford Lake</td></tr>
+<tr><td><span class="pill next">next</span></td><td>7. Sheltered coastal trial</td><td>Short route inside Ilfracombe harbour or Combe Martin bay on a calm day, with a chase kayak.</td><td>North Devon</td></tr>
+<tr><td><span class="pill stretch">stretch</span></td><td>8. Lundy passage</td><td>Weather-window dependent. Probably wants a bigger hull and a chase RIB; the autopilot code itself doesn't change.</td><td>Bristol Channel</td></tr>
+</tbody>
+</table>
+
+<h2>Where it could fail</h2>
+
+<ul class="dense">
+  <li><strong>Sim-vs-real boat dynamics mismatch.</strong> The current sim is tuned for a 4&nbsp;m hull. The IOM is much lighter and faster-responding. Expect to retune the PID gains and possibly the sail-trim stall angle.</li>
+  <li><strong>GPS jitter under sail.</strong> A 2&nbsp;Hz consumer GPS gives positions accurate to ~2&nbsp;m, fine on the Bristol Channel scale but coarse for harbour manoeuvring. The XTE lookahead in the route follower will need re-tuning.</li>
+  <li><strong>Wind sensing.</strong> True-wind solving from apparent + GPS course is noisy at low boat speed. Plan a fallback that uses a slowly-filtered apparent-wind reading directly.</li>
+  <li><strong>Knockdown recovery.</strong> The IOM self-rights, but the sail winch needs a defined neutral position so the boat doesn't capsize again under load. Add a "knockdown detected &rarr; release sheets" rule before any unsupervised run.</li>
+  <li><strong>Range &amp; retrieval.</strong> Even 1&nbsp;km offshore in a IOM is a long way to swim after if the radio link drops. Failsafe = drop sails + GPS-log SOS, but realistically you want a chase boat within sight.</li>
+</ul>
+
+<p class="footer">
+Repo: <code>stda-sailboat-simulator</code> on the <code>claude/sailboat-sim-route-interface-AyVII</code> branch. Build: <code>cd rust_src &amp;&amp; cargo run --release -- --scenario route --route routes/ilfracombe_to_lundy.yaml --chart charts/north_devon.json --max-run-time-s 60000</code>.
+</p>
+
+<script>
+document.getElementById('d').textContent = new Date().toISOString().slice(0,10);
+</script>
+
+</body>
+</html>
