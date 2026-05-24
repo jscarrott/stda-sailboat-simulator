@@ -1,0 +1,18 @@
+name: triangle
+acceptance_radius: 5.0
+close_hauled_angle_deg: 45.0
+xte_lookahead: 15.0
+min_tack_duration_s: 3.0
+
+# Beam reach for all three legs — no tacking should fire.
+wind:
+  direction_deg: 270.0   # wind from the west, blowing east
+  speed: 5.0
+
+waypoints:
+  - { x: 0.0,   y: 0.0   }
+  - { x: 0.0,   y: 60.0  }
+  - { x: 60.0,  y: 30.0  }
+  - { x: 0.0,   y: 0.0   }
+
+loop: false

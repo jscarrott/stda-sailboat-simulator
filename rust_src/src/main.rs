@@ -5,6 +5,7 @@
 mod config;
 mod controller;
 mod physics;
+mod route;
 mod sail;
 mod state;
 
@@ -13,6 +14,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 use config::{Config, Invariants};
+use route::Route;
 
 #[derive(Parser, Debug)]
 #[command(name = "sailboat_sim", version, about = "6-DOF sailboat simulator")]
@@ -49,6 +51,16 @@ fn main() -> Result<()> {
         "  invariants: gravity_force={:.4} N, wave_impedance={:.4}",
         inv.gravity_force, inv.wave_impedance
     );
+    if let Some(route_path) = &cli.route {
+        let r = Route::load(route_path)?;
+        println!(
+            "route {}: {} waypoints, acceptance_radius={} m, close_hauled={}°",
+            r.name,
+            r.waypoints.len(),
+            r.acceptance_radius,
+            r.close_hauled_angle_deg
+        );
+    }
     println!("scenario={} route={:?}", cli.scenario, cli.route);
     Ok(())
 }
