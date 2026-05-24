@@ -23,18 +23,20 @@ boat: {
         height:                 1.55,   # 6.2 ×λ (A-rig mast above deck)
         area:                   0.60,   # CR: A-rig total sail area, m^2
         length:                 0.25,   # 1.0 ×λ (chord)
-        stretching:             0.961   # dimensionless, kept from 4 m hull
+        stretching:             5.0     # aspect ratio: IOM A-rig is tall
+                                         # & narrow (luff²/area ≈ 5.6),
+                                         # not the 4 m hull's low-AR 0.961
     },
 
     rudder: {
-        stretching: 2.326923076923077,  # dimensionless, kept
+        stretching: 5.0,                 # deep narrow spade, AR ≈ 5
         area:       0.0081               # 0.13 ×λ^2
     },
 
     keel: {
         height:      0.1375,             # 0.55 ×λ
         length:      0.50,               # 2.0 ×λ
-        stretching:  0.605               # dimensionless, kept
+        stretching:  6.0                 # deep thin fin, AR ≈ 6-7
     },
 
     length:           1.0,               # CR: 1000 mm LOA
