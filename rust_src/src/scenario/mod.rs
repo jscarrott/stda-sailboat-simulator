@@ -12,7 +12,7 @@ use crate::route::{Route, WindOverride};
 use crate::state::{POS_X, POS_Y};
 use crate::wind_model::{ConstantWind, OrnsteinUhlenbeckWind, WindModel};
 
-pub use simulate::{simulate, SimResult};
+pub use simulate::{simulate, SimResult, Solver};
 
 /// CLI knobs for adding Ornstein–Uhlenbeck variance to the route's
 /// constant wind. All zero → pass through `ConstantWind`.
@@ -54,6 +54,7 @@ pub fn scenario_route(
     max_run_time_s: f64,
     wind_override: Option<WindOverride>,
     variance: Option<WindVariance>,
+    solver: Solver,
 ) -> Result<RouteRun> {
     let route = Route::load(route_path)?;
     let chart = chart_path.map(Chart::load).transpose()?;
@@ -100,6 +101,7 @@ pub fn scenario_route(
         n_steps,
         x0,
         true,
+        solver,
     )?;
     Ok(RouteRun { result, route, chart })
 }
