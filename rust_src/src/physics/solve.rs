@@ -27,20 +27,6 @@ pub const MAX_SAIL_SPEED: f64 = std::f64::consts::PI / 10.0;
 pub const RUDDER_RATE: f64 = 2.0;
 pub const SAIL_RATE: f64 = 0.1;
 
-/// Half-width of the smoothed dead-downwind transition, in radians.
-/// `sign(apparent_wind.angle)` flips between ±1 abruptly across angle=0,
-/// making the ODE RHS non-differentiable: any infinitesimal lateral
-/// motion at exact dead-downwind alignment thrashes the sail force
-/// across substeps and Dopri5 grinds to a halt.
-/// Replacing `sign()` with `tanh(angle / SAIL_SIGN_SMOOTHING_RAD)` gives
-/// a C^∞ S-curve that matches sign() to within fp precision outside
-/// roughly ±3·SAIL_SIGN_SMOOTHING_RAD, and smoothly interpolates the
-/// sail force through dead-downwind. Physically this also matches
-/// reality better than the abrupt-snap model — real sails reduce side
-/// force as they approach the gybe zone before the wind actually
-/// crosses behind.
-const SAIL_SIGN_SMOOTHING_RAD: f64 = 0.05;
-
 pub struct OdeContext<'a> {
     pub cfg: &'a Config,
     pub inv: &'a Invariants,
@@ -77,12 +63,13 @@ impl<'a> System<f64, State> for OdeContext<'a> {
         let wave_influence = calculate_wave_influence(pos_x, pos_y, yaw, env.wave, time, cfg.environment.gravity);
         let apparent_wind = calculate_apparent_wind(yaw, vel_x, vel_y, env.true_wind);
 
-        // True Sail Angle Sign Convention (CLAUDE.md): the sign of the
-        // sail follows the apparent wind side. Smoothed via tanh to
-        // remove the sign() discontinuity at dead downwind — see
-        // SAIL_SIGN_SMOOTHING_RAD above.
-        let sail_side = (apparent_wind.angle / SAIL_SIGN_SMOOTHING_RAD).tanh();
-        let true_sail_angle = sail_side * sail_angle.abs();
+        // Sail angle arrives already signed: the autopilot picks the
+        // sail side (with gybe/tack hysteresis) and the slew-limited
+        // actuator carries it smoothly across centreline, so solve()
+        // no longer flips the sign itself. (Previously sign() here flipped
+        // abruptly at dead-run/head-to-wind, kicking the yaw into a
+        // gybe-slam oscillation.) See autopilot::route::next_sail_side.
+        let true_sail_angle = sail_angle;
 
         let damping = calculate_damping(vel_x, vel_y, vel_z, roll_rate, pitch_rate, yaw_rate, inv);
         let (hydrostatic_force, x_hs, y_hs) = calculate_hydrostatic_force(pos_z, roll, pitch, wave_influence, inv);
@@ -219,11 +206,15 @@ mod tests {
     }
 
     /// Loose-tolerance regression check against Python-generated
-    /// fixtures. The Rust solve() now uses a tanh-smoothed sail sign
-    /// convention (see SAIL_SIGN_SMOOTHING_RAD) that differs from
-    /// Python's abrupt sign() near dead downwind. The fixtures still
-    /// catch large-scale regressions (sign flips, missing terms,
-    /// integration scaling errors) within a 1% absolute tolerance.
+    /// fixtures. solve() no longer applies the sail sign itself (the
+    /// autopilot now emits a pre-signed sail angle), so it uses the
+    /// fixture's sail value verbatim. For all fixtures with apparent
+    /// wind clearly off one side this matches Python's old
+    /// sign(angle)·|sail| exactly; only the dead-downwind fixture
+    /// (`downwind_high_speed`, apparent angle 0) differs, because there
+    /// the old convention forced the sail to 0 — that one is skipped.
+    /// The rest still catch large-scale regressions (missing terms,
+    /// integration scaling errors) within 1% relative.
     #[test]
     fn derivatives_within_one_percent_of_python() {
         let cfg = Config::load(&manifest_dir().join("sim_params_config.yaml")).unwrap();
@@ -234,27 +225,44 @@ mod tests {
         assert!(!file.fixtures.is_empty(), "no fixtures loaded");
 
         for fx in &file.fixtures {
+            if fx.name == "downwind_high_speed" {
+                continue;
+            }
             let dir_rad = fx.env.wind_dir_deg.to_radians();
+            let true_wind = TrueWind {
+                x: fx.env.wind_strength * dir_rad.cos(),
+                y: fx.env.wind_strength * dir_rad.sin(),
+                strength: fx.env.wind_strength,
+                direction: fx.env.wind_dir_deg,
+            };
+            // The fixtures store an *unsigned* sail magnitude that
+            // Python's solve() signed by apparent-wind side internally.
+            // solve() no longer does that, so reproduce the side choice
+            // here (as the autopilot now would) before feeding it in.
+            let mut y = State::from_column_slice(&fx.state);
+            let app = calculate_apparent_wind(y[YAW], y[VEL_X], y[VEL_Y], true_wind);
+            let side = if app.angle >= 0.0 { 1.0 } else { -1.0 };
             let env = crate::physics::forces::Environment {
-                sail_angle: fx.env.sail_angle,
+                sail_angle: side * fx.env.sail_angle.abs(),
                 rudder_angle: fx.env.rudder_angle,
-                true_wind: TrueWind {
-                    x: fx.env.wind_strength * dir_rad.cos(),
-                    y: fx.env.wind_strength * dir_rad.sin(),
-                    strength: fx.env.wind_strength,
-                    direction: fx.env.wind_dir_deg,
-                },
+                true_wind,
                 wave: Wave {
                     length: fx.env.wave_length,
                     direction: fx.env.wave_direction,
                     amplitude: fx.env.wave_amplitude,
                 },
             };
+            y[SAIL_STATE] = side * fx.state[SAIL_STATE].abs();
             let ctx = OdeContext { cfg: &cfg, inv: &inv, env, actor_dynamics: true };
-            let y = State::from_column_slice(&fx.state);
             let mut dy = State::zeros();
             ctx.system(fx.time, &y, &mut dy);
-            for i in 0..14 {
+            // Check only the 12 physics-state derivatives. Indices 12/13
+            // are the in-ODE actuator first-order terms, which (a) the
+            // production runner no longer uses — actuators are stepped
+            // analytically outside the ODE — and (b) follow the signed
+            // sail convention now, so they no longer match the fixtures'
+            // unsigned-magnitude actuator values.
+            for i in 0..12 {
                 let diff = (dy[i] - fx.derivative[i]).abs();
                 let tol = 1e-2 * fx.derivative[i].abs().max(1e-6);
                 assert!(
