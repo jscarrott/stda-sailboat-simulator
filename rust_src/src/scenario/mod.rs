@@ -8,7 +8,7 @@ use crate::chart::Chart;
 use crate::config::{Config, Invariants};
 use crate::physics::forces::Environment;
 use crate::physics::solve::initial_state;
-use crate::route::Route;
+use crate::route::{Route, WindOverride};
 use crate::state::{POS_X, POS_Y};
 
 pub use simulate::{simulate, SimResult};
@@ -26,20 +26,23 @@ pub struct RouteRun {
 /// run the simulator driven by a `RouteAutopilot`, and return the
 /// trajectory + route + chart for the plotter.
 ///
+/// `wind_override` (CLI flag) takes precedence over the route YAML's
+/// `wind` block; useful for wind-condition sweeps over a single route.
+///
 /// `max_run_time_s` caps wall-clock-equivalent simulation length.
-/// Increase for large routes (Ilfracombe → Lundy round trip is ~95 km).
 pub fn scenario_route(
     cfg: &Config,
     route_path: &Path,
     chart_path: Option<&Path>,
     max_run_time_s: f64,
+    wind_override: Option<WindOverride>,
 ) -> Result<RouteRun> {
     let route = Route::load(route_path)?;
     let chart = chart_path.map(Chart::load).transpose()?;
 
     let inv = Invariants::from_config(cfg);
     let mut env = Environment::from_config(cfg);
-    if let Some(w) = route.wind {
+    if let Some(w) = wind_override.or(route.wind) {
         env.true_wind = w.to_true_wind();
     }
 

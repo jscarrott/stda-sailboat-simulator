@@ -1,0 +1,18 @@
+name: pond_triangle
+acceptance_radius: 8.0
+close_hauled_angle_deg: 40.0
+xte_lookahead: 15.0
+min_tack_duration_s: 10.0
+
+# 100 m equilateral triangle sized so an IOM at ~0.5 m/s can complete
+# the lap in well under 20 minutes of sim time, before slow numerical
+# drift destabilises the integrator. Wind is supplied at the CLI so
+# the same course can be exercised under different conditions in a
+# sweep (see scripts/wind_sweep.sh).
+waypoints:
+  - { x:    0.0, y:    0.0 }
+  - { x:  100.0, y:    0.0 }
+  - { x:   50.0, y:   86.6 }
+  - { x:    0.0, y:    0.0 }
+
+loop: false
