@@ -21,6 +21,16 @@ gate_open_along_current: 0.15
 # forecastable current model — the analytic --tide-* stream or
 # --tide-data). 0 = react to the present current. Try e.g. 1800.
 gate_lead_time_s: 0.0
+# Required fair-tide window: the forecast must stay fair for at least
+# this long (from the lead-adjusted open time) before the gate opens, so
+# the boat isn't released onto a leg the tide turns foul on mid-way.
+# 0 = single-instant check. Also forecast-dependent. Try e.g. 1800.
+gate_min_fair_window_s: 0.0
+
+# A tidal gate on the FIRST waypoint gates departure: the boat holds at
+# the start until the first leg's fair window opens. Add `gate: true` to
+# waypoint 0 below to try it. (Station-keeping while holding only works
+# while the boat can out-sail the stream; in a spring tide it drifts.)
 
 waypoints:
   - { x: 0.0, y:    0.0 }

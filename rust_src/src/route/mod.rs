@@ -80,6 +80,14 @@ pub struct Route {
     /// current model — see `CurrentModel::forecaster`).
     #[serde(default)]
     pub gate_lead_time_s: f64,
+    /// Required fair-tide window (s) for a tidal gate to open: the
+    /// forecast must stay fair (along-leg current >= threshold) for at
+    /// least this long from the lead-adjusted open time, so the boat
+    /// isn't released onto a leg the tide will turn foul on mid-way.
+    /// 0 = only check the single lead-adjusted instant (no window).
+    /// Needs a forecastable current model to have any effect.
+    #[serde(default)]
+    pub gate_min_fair_window_s: f64,
     pub waypoints: Vec<Waypoint>,
     #[serde(rename = "loop", default = "default_loop")]
     pub loop_route: bool,
@@ -125,6 +133,7 @@ pub struct RouteFollower {
     last_tack_change_t: f64,
     finished: bool,
     waiting_at_gate: bool,
+    departed: bool,
 }
 
 impl RouteFollower {
@@ -136,6 +145,7 @@ impl RouteFollower {
             last_tack_change_t: f64::NEG_INFINITY,
             finished: false,
             waiting_at_gate: false,
+            departed: false,
         }
     }
 
@@ -158,6 +168,33 @@ impl RouteFollower {
         let dy = b.y - a.y;
         let len = dx.hypot(dy).max(1e-9);
         (current.0 * dx + current.1 * dy) / len
+    }
+
+    /// Whether the tidal gate before the leg `from_idx -> from_idx+1`
+    /// should open at time `t`. The forecast must show the along-leg
+    /// current staying >= `gate_open_along_current` for the whole
+    /// `gate_min_fair_window_s`, sampled from `t + gate_lead_time_s`.
+    /// With no forecast it falls back to the present `current`; with a
+    /// zero window it's a single-instant check.
+    fn gate_open_for_leg(
+        &self,
+        from_idx: usize,
+        t: f64,
+        current: (f64, f64),
+        forecast: &TideForecast,
+    ) -> bool {
+        let lead = self.route.gate_lead_time_s;
+        let window = self.route.gate_min_fair_window_s.max(0.0);
+        let threshold = self.route.gate_open_along_current;
+        const N: usize = 12;
+        for k in 0..=N {
+            let ts = t + lead + window * (k as f64) / (N as f64);
+            let cur = forecast.at(ts).unwrap_or(current);
+            if self.gate_along_current(from_idx, cur) < threshold {
+                return false;
+            }
+        }
+        true
     }
 
     pub fn route(&self) -> &Route {
@@ -192,6 +229,26 @@ impl RouteFollower {
             return None;
         }
 
+        // ----- Departure gate -----
+        // If the first waypoint is a tidal gate, hold near the start
+        // until the first leg's fair-tide window opens — forecast-aware
+        // departure planning. Loiter by steering back at the start
+        // waypoint (so the boat station-keeps rather than being swept
+        // off, as far as it can out-sail the stream).
+        if !self.departed {
+            let start = self.route.waypoints[0];
+            if start.gate
+                && self.route.waypoints.len() >= 2
+                && !self.gate_open_for_leg(0, t, current, forecast)
+            {
+                self.waiting_at_gate = true;
+                self.tack = Tack::None;
+                return Some((start.y - pos_y).atan2(start.x - pos_x));
+            }
+            self.departed = true;
+            self.waiting_at_gate = false;
+        }
+
         // ----- Capture -----
         let target = self.route.waypoints[self.leg_index + 1];
         let dist_to_target = ((target.x - pos_x).powi(2) + (target.y - pos_y).powi(2)).sqrt();
@@ -204,11 +261,7 @@ impl RouteFollower {
             // tide arrives; without one we fall back to the present.
             let target_idx = self.leg_index + 1;
             let is_gate = target.gate && target_idx + 1 < self.route.waypoints.len();
-            let probe = forecast.at(t + self.route.gate_lead_time_s).unwrap_or(current);
-            if is_gate
-                && self.gate_along_current(target_idx, probe)
-                    < self.route.gate_open_along_current
-            {
+            if is_gate && !self.gate_open_for_leg(target_idx, t, current, forecast) {
                 self.waiting_at_gate = true;
                 self.tack = Tack::None;
                 return Some((target.y - pos_y).atan2(target.x - pos_x));
@@ -318,6 +371,7 @@ mod tests {
             waypoints: vec![Waypoint { x: ax, y: ay, gate: false }, Waypoint { x: bx, y: by, gate: false }],
             gate_open_along_current: 0.0,
             gate_lead_time_s: 0.0,
+            gate_min_fair_window_s: 0.0,
             loop_route: false,
         }
     }
@@ -379,6 +433,49 @@ mod tests {
         rf.update(80.0, 98.0, 0.0, wind, present80, &fc);
         assert!(!rf.waiting_at_gate(), "forecast lead opens the gate early");
         assert_eq!(rf.leg_index, 1);
+    }
+
+    #[test]
+    fn tidal_gate_requires_long_enough_fair_window() {
+        // Next leg due east. Stream along +x with a 100 s period: fair
+        // (sin>0) only for t in (0,50) each cycle. Demand a 40 s fair
+        // window. At t=40 it's fair NOW but turns foul at t=50 (only 10 s
+        // left) → must hold. At t=2 the whole 0..40 window is fair → open.
+        let mut route = straight_route("gated_win", 0.0, 0.0, 100.0, 0.0);
+        route.waypoints.push(Waypoint { x: 200.0, y: 0.0, gate: false });
+        route.waypoints[1].gate = true;
+        route.gate_min_fair_window_s = 40.0;
+        let wind = wind_from_deg(5.0, 90.0);
+        let fc = TideForecast::Stream { peak_speed: 0.6, axis_rad: 0.0, period_s: 100.0, phase_rad: 0.0 };
+
+        let mut rf = RouteFollower::new(route);
+        // t=40: fair now but window 40..80 goes foul → hold.
+        rf.update(40.0, 98.0, 0.0, wind, fc.at(40.0).unwrap(), &fc);
+        assert!(rf.waiting_at_gate(), "short remaining fair window → hold");
+        // t=2: window 2..42 is (almost) all fair → open.
+        rf.update(2.0, 98.0, 0.0, wind, fc.at(2.0).unwrap(), &fc);
+        assert!(!rf.waiting_at_gate(), "full fair window ahead → open");
+        assert_eq!(rf.leg_index, 1);
+    }
+
+    #[test]
+    fn departure_gate_holds_at_start_until_fair() {
+        // First waypoint is a gate; first leg runs due east (+x). Hold at
+        // the start in a foul (westward) stream, release when it's fair.
+        let mut route = straight_route("dep", 0.0, 0.0, 100.0, 0.0);
+        route.waypoints[0].gate = true;
+        let wind = wind_from_deg(5.0, 90.0);
+
+        let mut rf = RouteFollower::new(route);
+        rf.update(0.0, 0.0, 0.0, wind, (-0.5, 0.0), &TideForecast::None);
+        assert!(rf.waiting_at_gate(), "foul tide at start → hold departure");
+        assert_eq!(rf.leg_index, 0);
+
+        rf.update(10.0, 0.0, 0.0, wind, (0.5, 0.0), &TideForecast::None);
+        assert!(!rf.waiting_at_gate(), "fair tide → depart");
+        // Once departed it follows the leg normally on subsequent ticks.
+        rf.update(20.0, 1.0, 0.0, wind, (0.5, 0.0), &TideForecast::None);
+        assert_eq!(rf.leg_index, 0); // still on the first leg, just sailing it
     }
 
     #[test]
@@ -464,6 +561,7 @@ mod tests {
             ],
             gate_open_along_current: 0.0,
             gate_lead_time_s: 0.0,
+            gate_min_fair_window_s: 0.0,
             loop_route: false,
         };
         let mut rf = RouteFollower::new(route);
