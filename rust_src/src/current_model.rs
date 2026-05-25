@@ -22,6 +22,57 @@ pub trait CurrentModel {
     /// Water current velocity in the global frame `(east, north)`, m/s,
     /// at simulation time `t`.
     fn sample(&mut self, t: f64) -> (f64, f64);
+
+    /// A deterministic forward forecast of this current, for tidal-gate
+    /// look-ahead. Stateless (unlike `sample`), so it can be queried at
+    /// future times. Defaults to `None` for models that can't be
+    /// forecast (e.g. the random OU gusts).
+    fn forecaster(&self) -> TideForecast {
+        TideForecast::None
+    }
+}
+
+/// A cloneable, stateless forward forecast of the tidal current, used by
+/// tidal gates to anticipate the turn (release the gate `lead` seconds
+/// before the stream becomes fair so the boat is already moving).
+#[derive(Clone, Debug)]
+pub enum TideForecast {
+    /// No usable forecast — gating falls back to the present current.
+    None,
+    /// Analytic reversing stream (matches `TidalStream`).
+    Stream { peak_speed: f64, axis_rad: f64, period_s: f64, phase_rad: f64 },
+    /// Tabulated series (matches `TabulatedCurrent`).
+    Table { dt_s: f64, u_east: Vec<f64>, v_north: Vec<f64> },
+}
+
+impl TideForecast {
+    /// Predicted current `(east, north)` at sim time `t`, or `None` if
+    /// this forecast carries no information.
+    pub fn at(&self, t: f64) -> Option<(f64, f64)> {
+        match self {
+            TideForecast::None => None,
+            TideForecast::Stream { peak_speed, axis_rad, period_s, phase_rad } => {
+                let s = peak_speed * (2.0 * PI * t / period_s + phase_rad).sin();
+                Some((s * axis_rad.cos(), s * axis_rad.sin()))
+            }
+            TideForecast::Table { dt_s, u_east, v_north } => {
+                Some(interp_table(*dt_s, u_east, v_north, t))
+            }
+        }
+    }
+}
+
+/// Linear interpolation of a `(u, v)` time series at `t = 0` mapped to
+/// sample 0, step `dt_s`, endpoints held.
+fn interp_table(dt_s: f64, u: &[f64], v: &[f64], t: f64) -> (f64, f64) {
+    let n = u.len();
+    let f = (t / dt_s).clamp(0.0, (n - 1) as f64);
+    let i = f.floor() as usize;
+    if i + 1 >= n {
+        return (u[n - 1], v[n - 1]);
+    }
+    let frac = f - i as f64;
+    (u[i] + (u[i + 1] - u[i]) * frac, v[i] + (v[i + 1] - v[i]) * frac)
 }
 
 /// Still water.
@@ -62,6 +113,15 @@ impl CurrentModel for TidalStream {
         let speed = self.peak_speed * (2.0 * PI * t / self.period_s + self.phase_rad).sin();
         (speed * self.axis_rad.cos(), speed * self.axis_rad.sin())
     }
+
+    fn forecaster(&self) -> TideForecast {
+        TideForecast::Stream {
+            peak_speed: self.peak_speed,
+            axis_rad: self.axis_rad,
+            period_s: self.period_s,
+            phase_rad: self.phase_rad,
+        }
+    }
 }
 
 /// A measured/forecast current time series (e.g. from CMEMS via
@@ -92,18 +152,15 @@ impl TabulatedCurrent {
 
 impl CurrentModel for TabulatedCurrent {
     fn sample(&mut self, t: f64) -> (f64, f64) {
-        let n = self.u_east.len();
-        let f = (t / self.dt_s).clamp(0.0, (n - 1) as f64);
-        let i = f.floor() as usize;
-        if i + 1 >= n {
-            return (self.u_east[n - 1], self.v_north[n - 1]);
+        interp_table(self.dt_s, &self.u_east, &self.v_north, t)
+    }
+
+    fn forecaster(&self) -> TideForecast {
+        TideForecast::Table {
+            dt_s: self.dt_s,
+            u_east: self.u_east.clone(),
+            v_north: self.v_north.clone(),
         }
-        let frac = f - i as f64;
-        let lerp = |a: f64, b: f64| a + (b - a) * frac;
-        (
-            lerp(self.u_east[i], self.u_east[i + 1]),
-            lerp(self.v_north[i], self.v_north[i + 1]),
-        )
     }
 }
 

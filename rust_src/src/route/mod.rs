@@ -4,6 +4,7 @@ use std::f64::consts::PI;
 use std::fs::File;
 use std::path::Path;
 
+use crate::current_model::TideForecast;
 use crate::physics::wind::TrueWind;
 
 #[derive(Deserialize, Clone, Copy, Debug)]
@@ -72,6 +73,13 @@ pub struct Route {
     /// positive value demands a fair tide of at least that strength.
     #[serde(default)]
     pub gate_open_along_current: f64,
+    /// Forecast lead time (s) for tidal gates. The gate opens when the
+    /// *forecast* stream `gate_lead_time_s` from now will be fair, so
+    /// the boat starts moving early and is up to speed as the fair tide
+    /// arrives. 0 = react to the present current (needs a forecastable
+    /// current model — see `CurrentModel::forecaster`).
+    #[serde(default)]
+    pub gate_lead_time_s: f64,
     pub waypoints: Vec<Waypoint>,
     #[serde(rename = "loop", default = "default_loop")]
     pub loop_route: bool,
@@ -178,6 +186,7 @@ impl RouteFollower {
         pos_y: f64,
         true_wind: TrueWind,
         current: (f64, f64),
+        forecast: &TideForecast,
     ) -> Option<f64> {
         if self.finished {
             return None;
@@ -189,11 +198,15 @@ impl RouteFollower {
         if dist_to_target < self.route.acceptance_radius {
             // Tidal gate: hold here until the stream turns fair for the
             // next leg. Loiter by steering back at the gate waypoint;
-            // do not advance the leg until the gate opens.
+            // do not advance the leg until the gate opens. With a
+            // forecast we probe the stream `gate_lead_time_s` ahead so
+            // the gate opens early and the boat is moving as the fair
+            // tide arrives; without one we fall back to the present.
             let target_idx = self.leg_index + 1;
             let is_gate = target.gate && target_idx + 1 < self.route.waypoints.len();
+            let probe = forecast.at(t + self.route.gate_lead_time_s).unwrap_or(current);
             if is_gate
-                && self.gate_along_current(target_idx, current)
+                && self.gate_along_current(target_idx, probe)
                     < self.route.gate_open_along_current
             {
                 self.waiting_at_gate = true;
@@ -304,6 +317,7 @@ mod tests {
             wind: None,
             waypoints: vec![Waypoint { x: ax, y: ay, gate: false }, Waypoint { x: bx, y: by, gate: false }],
             gate_open_along_current: 0.0,
+            gate_lead_time_s: 0.0,
             loop_route: false,
         }
     }
@@ -321,15 +335,50 @@ mod tests {
 
         // Arrive at the gate with a foul (westward) current → must hold,
         // not advance: still steering toward wp1, flagged waiting.
-        let h = rf.update(0.0, 98.0, 0.0, wind, (-0.6, 0.0)).expect("not finished");
+        let h = rf
+            .update(0.0, 98.0, 0.0, wind, (-0.6, 0.0), &TideForecast::None)
+            .expect("not finished");
         assert!(rf.waiting_at_gate(), "should wait at gate in foul tide");
         assert_eq!(rf.leg_index, 0, "must not advance past the gate");
         assert!(h.abs() < 1e-9, "holds by pointing at the gate (due east)");
 
         // Tide turns fair (eastward) → gate opens, leg advances.
-        rf.update(100.0, 98.0, 0.0, wind, (0.6, 0.0));
+        rf.update(100.0, 98.0, 0.0, wind, (0.6, 0.0), &TideForecast::None);
         assert!(!rf.waiting_at_gate(), "gate should open on fair tide");
         assert_eq!(rf.leg_index, 1, "advanced onto the next leg");
+    }
+
+    #[test]
+    fn tidal_gate_forecast_lead_opens_early() {
+        // Same gate (next leg due east, +x). Reversing E/W stream with a
+        // 100 s period: at t=0 it's foul, but it turns fair ~25 s later.
+        let mut route = straight_route("gated_fc", 0.0, 0.0, 100.0, 0.0);
+        route.waypoints.push(Waypoint { x: 200.0, y: 0.0, gate: false });
+        route.waypoints[1].gate = true;
+        route.gate_lead_time_s = 30.0; // look 30 s ahead
+        let wind = wind_from_deg(5.0, 90.0);
+        // Stream along +x: speed = 0.6·sin(2π t/100). Foul (negative) for
+        // t in (50,100), fair for t in (0,50). At t=60 it's foul now but
+        // forecast at t+30=90 is still foul → hold.
+        let fc = TideForecast::Stream {
+            peak_speed: 0.6,
+            axis_rad: 0.0,
+            period_s: 100.0,
+            phase_rad: 0.0,
+        };
+        // present current at t=60 (foul) — but we pass the forecast.
+        let mut rf = RouteFollower::new(route);
+        let present = (0.6 * (2.0 * PI * 60.0 / 100.0).sin(), 0.0); // foul
+        rf.update(60.0, 98.0, 0.0, wind, present, &fc);
+        assert!(rf.waiting_at_gate(), "t=60: foul now and at t+30=90 → hold");
+
+        // At t=80, forecast at t+30=110≡10 in next cycle is fair → open
+        // early, before the present stream (still foul at t=80) turns.
+        let present80 = (0.6 * (2.0 * PI * 80.0 / 100.0).sin(), 0.0); // foul
+        assert!(present80.0 < 0.0, "sanity: present still foul at t=80");
+        rf.update(80.0, 98.0, 0.0, wind, present80, &fc);
+        assert!(!rf.waiting_at_gate(), "forecast lead opens the gate early");
+        assert_eq!(rf.leg_index, 1);
     }
 
     #[test]
@@ -350,7 +399,7 @@ mod tests {
         let wind = wind_from_deg(5.0, 90.0);
         // Boat 5m south of the rhumb. chi_path=0, xte = -5.
         // chi_los = atan2(5, 15) ≈ 0.3217 rad ≈ +18° (turn north to recover).
-        let h = rf.update(0.0, 50.0, -5.0, wind, (0.0, 0.0)).expect("not finished");
+        let h = rf.update(0.0, 50.0, -5.0, wind, (0.0, 0.0), &TideForecast::None).expect("not finished");
         let expected = (5.0_f64).atan2(15.0);
         assert!((h - expected).abs() < 1e-9, "got {} expected {}", h, expected);
         assert_eq!(rf.current_tack(), Tack::None);
@@ -366,14 +415,14 @@ mod tests {
         //   velocity = (-5*cos90, -5*sin90) = (0, -5). atan2(-5, 0) = -π/2. +π = π/2. ✓
         // bearing_to_target from (0,0) to (0,100) = π/2.
         // off_wind = wrap_pi(π/2 - π/2) = 0 → in no-go.
-        let h0 = rf.update(0.0, 0.0, 0.0, wind, (0.0, 0.0)).expect("not finished");
+        let h0 = rf.update(0.0, 0.0, 0.0, wind, (0.0, 0.0), &TideForecast::None).expect("not finished");
         // Both VMGs equal (cos ±π/4) → preferred=Port; cand_port = π/2 + π/4 = 3π/4.
         assert!((h0 - 3.0 * PI / 4.0).abs() < 1e-9, "got {}", h0);
         assert_eq!(rf.current_tack(), Tack::Port);
         // Holding the same position should hold the same tack (no chatter).
         for step in 1..10 {
             let t = step as f64 * 0.3;
-            let h = rf.update(t, 0.0, 0.0, wind, (0.0, 0.0)).expect("not finished");
+            let h = rf.update(t, 0.0, 0.0, wind, (0.0, 0.0), &TideForecast::None).expect("not finished");
             assert!((h - 3.0 * PI / 4.0).abs() < 1e-9);
             assert_eq!(rf.current_tack(), Tack::Port);
         }
@@ -387,14 +436,14 @@ mod tests {
         let mut rf = RouteFollower::new(route);
         let wind = wind_from_deg(5.0, 90.0);
         // Latch a tack at origin.
-        rf.update(0.0, 0.0, 0.0, wind, (0.0, 0.0));
+        rf.update(0.0, 0.0, 0.0, wind, (0.0, 0.0), &TideForecast::None);
         assert_eq!(rf.current_tack(), Tack::Port);
         // Now boat is at (-40, 60). Bearing to (0,200) = atan2(140, 40) ≈ 1.292 rad.
         // off_wind = wrap_pi(1.292 - π/2) ≈ -0.279 rad → still in no-go (|.|<π/4).
         // VMG: cand_port (3π/4=2.356) vs bearing 1.292 → cos(1.064) ≈ 0.487.
         //      cand_starboard (π/4=0.785) vs bearing 1.292 → cos(-0.507) ≈ 0.874.
         // Preferred = Starboard. Should switch since min_tack_duration_s=3 elapsed at t=10.
-        let h = rf.update(10.0, -40.0, 60.0, wind, (0.0, 0.0)).expect("not finished");
+        let h = rf.update(10.0, -40.0, 60.0, wind, (0.0, 0.0), &TideForecast::None).expect("not finished");
         assert_eq!(rf.current_tack(), Tack::Starboard);
         assert!((h - PI / 4.0).abs() < 1e-9, "got {}", h);
     }
@@ -414,19 +463,20 @@ mod tests {
                 Waypoint { x: 100.0, y: 0.0, gate: false },
             ],
             gate_open_along_current: 0.0,
+            gate_lead_time_s: 0.0,
             loop_route: false,
         };
         let mut rf = RouteFollower::new(route);
         let wind = wind_from_deg(5.0, 90.0); // crosswind, no tacking
         // Before capture: leg 0→1.
-        rf.update(0.0, 0.0, 0.0, wind, (0.0, 0.0));
+        rf.update(0.0, 0.0, 0.0, wind, (0.0, 0.0), &TideForecast::None);
         assert_eq!(rf.leg_index, 0);
         // Step into the acceptance radius of waypoint 1.
-        rf.update(1.0, 48.0, 0.0, wind, (0.0, 0.0));
+        rf.update(1.0, 48.0, 0.0, wind, (0.0, 0.0), &TideForecast::None);
         assert_eq!(rf.leg_index, 1);
         assert!(!rf.finished());
         // Capture the final waypoint.
-        let h = rf.update(2.0, 98.0, 0.0, wind, (0.0, 0.0));
+        let h = rf.update(2.0, 98.0, 0.0, wind, (0.0, 0.0), &TideForecast::None);
         assert!(rf.finished());
         assert!(h.is_none());
     }
