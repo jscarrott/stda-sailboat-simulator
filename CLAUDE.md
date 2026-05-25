@@ -20,6 +20,115 @@ basis for new work.
 
 ---
 
+## Source Paper
+
+The model is taken from:
+
+> M. C. Buehler, C. Heinz, S. Kohaut, *"Dynamic Simulation Model for an Autonomous
+> Sailboat"*, Sailing Team Darmstadt e.V., Proc. International Robotic Sailing
+> Conference 2018, Southampton. Original code: `github.com/simko96/stda-sailboat-simulator`.
+
+`docs/` is the place for a copy of the PDF. The equation numbers below refer to that paper.
+
+### Scope and validation status (read this first)
+
+The model deliberately targets **dynamic behaviour, not speed accuracy**. Direct quotes:
+
+- *"In contrast to standard velocity prediction programs (VPP) … the precise prediction
+  of the actual reachable velocities are of minor interest."* (Abstract)
+- *"so far we do not have empirical data to validate its performance. Instead we
+  qualitatively examine for plausibility."* (§3)
+- *"we still need to record real data, to identify parameters like damping."* (Conclusion)
+
+**Implications.** Absolute boat speeds are uncalibrated. The published model produces
+~0.8–1.0 m/s for the 4 m hull at 5 m/s wind, and the Rust port reproduces this
+(≈0.72 m/s at 4 m/s). The free parameters that set absolute speed — the **damping
+coefficients `d`** and the **wave-resistance weight `c_wr`** — are explicitly rough
+estimates the authors flag for real-data identification. Treat any speed match (e.g. the
+IOM `wave_resistance_weight = 0.06` curve-fit) as provisional until fitted against a
+measured polar. Use `--scenario polar` to measure; see `docs/project_plan.html` phase 2b/6.
+
+### Reference frames (§2.1)
+
+1. **Global / navigational** — position `(xg, yg, zg)`, heading `ψ`; `z = 0` at the
+   undisturbed surface. Position kinematics (eq. 1).
+2. **Heading frame** — at the CoG, parallel to the water surface, x-axis along heading.
+   Buoyancy `Fhs`, translation dynamics `(vx, vy, vz)` and wave resistance live here.
+3. **Body frame** — fixed to the hull, reached from the heading frame by roll `φ`
+   (pitch `θ` assumed small). Rotational dynamics and the sail/rudder/keel forces live here.
+
+Relative flow on a foil: `v_rel = v_flow − v − Ω × r_foil` (the `Ω × r_foil` rotational
+term is **not** in the current code — forces use `v_flow − v` only).
+
+### Foil lift & drag (§2.2, eqs. 5–7)
+
+Both sails and lateral foils (keel, rudder) are modelled as thin foils in a stream:
+
+- Lift coefficient `cL = cL,0 + cL,α·α`, with `cL,0 = 0` (symmetric) and slope
+  `cL,α = 2π` (thin-airfoil theory).
+- Drag `cD = cf + cD,i`. Induced drag `cD,i = cL² / (π·Λ)` where **`Λ` is the geometric
+  stretching = aspect ratio** (the YAML `stretching` fields). Friction
+  `cf = 2.66 / √Re`, laminar flat plate, `Re = v·l / ν` (`l` = chord, `ν` = kinematic
+  viscosity). → higher `Λ` = more lift per AoA + less induced drag = points/drives better.
+- Force (eq. 7): `F = q·A·[(sinβ·cL − cosβ·cD)·e1 − (sinβ·cD + cosβ·cL)·e2]`,
+  dynamic pressure `q = ½·ρ·v_rel²`, `β` the relative-flow angle.
+- Point of application: ¼-chord (symmetric) shifting toward ⅓-chord (asymmetric,
+  AoA-dependent).
+
+### Flow separation (§2.2.2)
+
+At large AoA the flow separates: lift drops, pressure drag grows. Separated drag
+`cD = sin²(α)`; at 90° there's no lift, `cD ≈ 1`, and the load acts at the foil centre.
+Attached↔separated is blended by `s = 1 − exp(−(α / α_sep)²)` with `α_sep = 25°`, giving
+a ~15° stall angle. (See "Separation Factor" below — matches the code exactly.)
+
+### Wave resistance (§2.3, eq. 8)
+
+Displacement-hull wave-making drag, the dominant speed limiter. Hull speed
+`v_hull = 0.4·√(g·l_wl)` → ~2.5 m/s for a 4 m waterline, ~1.25 m/s for a 1 m IOM.
+Paper form: `Fwr = −sign(vx)·c_wr·q·A_LK·(v/v_hull)⁴` (≈ a 6th-order speed polynomial),
+with tunable weight `c_wr` and lateral area `A_LK`.
+
+**Code differs:** `calculate_wave_impedance` uses `−sign(vx)·v²·(v/v_hull)²·(c_wr·ρ/2·A_LK)`
+— i.e. `(v/v_hull)²`, a 4th-order total, not the paper's 6th-order. `c_wr` is
+`boat.wave_resistance_weight` (default 1.0).
+
+### Hydrostatic buoyancy & waves (§2.4, eqs. 9–10)
+
+`Fhs ≈ m·g + ρ·g·A_w·(η − zg)` (`A_w` = waterplane area, `η` = wave elevation). The load
+point depends on buoyancy height above CoG and the waterplane second moments `I_L`
+(roll) and `I_T` (pitch); `I_T ≫ I_L` keeps pitch small. Effective roll/pitch are taken
+relative to the wave surface (`φ_eff`, `θ_eff`). Assumes wavelength ≫ hull length.
+
+### Damping (§2.5)
+
+Linear, decoupled: `[F_D; T_D] = −d·[v; Ω]`. The paper calls these **"rough estimates"**
+and notes a quadratic term would be better. These are the `*_damping` / `yaw_timeconstant`
+YAML fields and the prime candidates (with `c_wr`) for real-data tuning.
+
+### Actuators & inputs (§2.6)
+
+First-order lag with time constant `τ`; the sail's *sign* follows the relative wind while
+its *magnitude* is set by the controller (rope length). Paper values: rudder `τ ≈ 0.1 s`,
+sail `τ ≈ 3 s`; rudder limit `±35°`, sail `±90°`; control sample time `100 ms`.
+
+**Code differs:** the runner steps actuators analytically (`RUDDER_RATE = 2.0` → τ = 0.5 s,
+`SAIL_RATE = 0.1` → τ = 10 s), uses a `±15°` rudder limit (`controller.rs`) and a `0.3 s`
+control period (`SAMPLE_TIME`). Revisit these against the paper if matching its traces.
+
+### Not modelled
+
+- **Added mass** — the paper flags it as planned-but-absent and important for roll
+  (Korotkin 2009). Still not implemented; expect roll dynamics to be too lively.
+- The `Ω × r_foil` rotational inflow term (see frames, above).
+
+### Integration
+
+Dormand–Prince adaptive Runge–Kutta (the `Dopri5` path; the port adds a fixed-step
+`Rk4` option for the stiffer IOM dynamics).
+
+---
+
 ## Running the Code
 
 ### Rust (primary target)
