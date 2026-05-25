@@ -239,6 +239,7 @@ mod tests {
             waypoints: vec![Waypoint { x: 0.0, y: 0.0, gate: false }, Waypoint { x: 0.0, y: 100.0, gate: false }],
             gate_open_along_current: 0.0,
             gate_lead_time_s: 0.0,
+            gate_min_fair_window_s: 0.0,
             loop_route: false,
         }
     }
