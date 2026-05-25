@@ -7,6 +7,7 @@ use std::f64::consts::PI;
 use crate::autopilot::{Autopilot, Command, Observation};
 use crate::config::Config;
 use crate::controller::HeadingController;
+use crate::current_model::TideForecast;
 use crate::physics::wind::{calculate_apparent_wind, TrueWind};
 use crate::route::{Route, RouteFollower, Tack};
 use crate::sail::sail_angle;
@@ -44,6 +45,10 @@ pub struct RouteAutopilot {
     /// resulting course over ground tracks the desired course despite
     /// the tidal set (direct steering only — never while tacking).
     crab_enabled: bool,
+    /// Tidal-current forecast for gate look-ahead (matches the run's
+    /// current model). `TideForecast::None` → gates use the present
+    /// current only.
+    forecast: TideForecast,
 }
 
 impl RouteAutopilot {
@@ -53,6 +58,7 @@ impl RouteAutopilot {
         control_period_s: f64,
         sail_resample_period_s: f64,
         crab_enabled: bool,
+        forecast: TideForecast,
     ) -> Self {
         Self {
             follower: RouteFollower::new(route),
@@ -63,6 +69,7 @@ impl RouteAutopilot {
             last_sail_t: None,
             sail_side: 1.0,
             crab_enabled,
+            forecast,
         }
     }
 
@@ -126,7 +133,7 @@ impl Autopilot for RouteAutopilot {
 
         let desired = match self
             .follower
-            .update(obs.t, obs.pos_x, obs.pos_y, tw, obs.current)
+            .update(obs.t, obs.pos_x, obs.pos_y, tw, obs.current, &self.forecast)
         {
             Some(h) => h,
             None => {
@@ -231,6 +238,7 @@ mod tests {
             wind: None,
             waypoints: vec![Waypoint { x: 0.0, y: 0.0, gate: false }, Waypoint { x: 0.0, y: 100.0, gate: false }],
             gate_open_along_current: 0.0,
+            gate_lead_time_s: 0.0,
             loop_route: false,
         }
     }
@@ -271,7 +279,7 @@ mod tests {
 
     #[test]
     fn autopilot_signals_mission_complete_when_route_done() {
-        let mut ap = RouteAutopilot::new(&cfg(), straight_north_route(), 0.3, 2.0, true);
+        let mut ap = RouteAutopilot::new(&cfg(), straight_north_route(), 0.3, 2.0, true, TideForecast::None);
         // Step once well inside acceptance radius of the only target.
         let cmd = ap.step(&obs(0.0, 0.0, 99.0));
         assert!(cmd.mission_complete, "captured final waypoint should end mission");
@@ -279,7 +287,7 @@ mod tests {
 
     #[test]
     fn autopilot_emits_finite_rudder_and_sail() {
-        let mut ap = RouteAutopilot::new(&cfg(), straight_north_route(), 0.3, 2.0, true);
+        let mut ap = RouteAutopilot::new(&cfg(), straight_north_route(), 0.3, 2.0, true, TideForecast::None);
         let cmd = ap.step(&obs(0.0, 0.0, 0.0));
         assert!(cmd.rudder_angle.is_finite());
         assert!(cmd.sail_angle.is_finite());

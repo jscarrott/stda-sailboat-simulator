@@ -110,8 +110,9 @@ pub fn scenario_route(
         }
     };
 
+    let forecast = current_model.forecaster();
     let mut autopilot =
-        RouteAutopilot::new(cfg, route.clone(), SAMPLE_TIME, SAIL_SAMPLE_TIME, crab);
+        RouteAutopilot::new(cfg, route.clone(), SAMPLE_TIME, SAIL_SAMPLE_TIME, crab, forecast);
     let mut x0 = initial_state(cfg, true);
     if let Some(start) = route.waypoints.first() {
         x0[POS_X] = start.x;

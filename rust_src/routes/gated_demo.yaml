@@ -16,6 +16,11 @@ wind:
 
 # Open the gate once the along-next-leg (north) current is >= 0.15 m/s.
 gate_open_along_current: 0.15
+# Forecast lead: open the gate this many seconds BEFORE the stream turns
+# fair, so the boat is up to speed as the fair tide arrives (needs a
+# forecastable current model — the analytic --tide-* stream or
+# --tide-data). 0 = react to the present current. Try e.g. 1800.
+gate_lead_time_s: 0.0
 
 waypoints:
   - { x: 0.0, y:    0.0 }
