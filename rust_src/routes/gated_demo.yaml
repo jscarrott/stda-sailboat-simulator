@@ -1,0 +1,25 @@
+name: gated_demo
+acceptance_radius: 20.0
+close_hauled_angle_deg: 45.0
+xte_lookahead: 40.0
+min_tack_duration_s: 30.0
+
+# Demonstrates a tidal gate. Wind from the west (beam reach heading
+# north). Two north legs; the waypoint between them is a tidal gate, so
+# the boat loiters there until the tidal stream sets north (fair for the
+# second leg) before proceeding. Run with a reversing N/S tide, e.g.
+#   --tide-peak 0.6 --tide-flood-deg 0 --tide-period-h 2 --tide-phase-deg 200
+# (phase 200° starts the stream foul/south so the gate actually holds).
+wind:
+  direction_deg: 0.0
+  speed: 4.0
+
+# Open the gate once the along-next-leg (north) current is >= 0.15 m/s.
+gate_open_along_current: 0.15
+
+waypoints:
+  - { x: 0.0, y:    0.0 }
+  - { x: 0.0, y:  500.0, gate: true }
+  - { x: 0.0, y: 1000.0 }
+
+loop: false

@@ -10,6 +10,10 @@
 
 use std::f64::consts::PI;
 
+use anyhow::{Context, Result};
+use serde::Deserialize;
+use std::path::Path;
+
 /// Semidiurnal lunar tidal period, seconds (12 h 25.2 min). The
 /// dominant constituent (M2) in the Bristol Channel.
 pub const SEMIDIURNAL_PERIOD_S: f64 = 12.42 * 3600.0;
@@ -60,6 +64,49 @@ impl CurrentModel for TidalStream {
     }
 }
 
+/// A measured/forecast current time series (e.g. from CMEMS via
+/// scripts/fetch_tides.py): uniform in space, linearly interpolated in
+/// time. `t = 0` maps to the first sample; before/after the series the
+/// endpoints are held.
+#[derive(Deserialize)]
+pub struct TabulatedCurrent {
+    dt_s: f64,
+    u_east: Vec<f64>,
+    v_north: Vec<f64>,
+}
+
+impl TabulatedCurrent {
+    pub fn load(path: &Path) -> Result<Self> {
+        let file = std::fs::File::open(path)
+            .with_context(|| format!("opening tide data {}", path.display()))?;
+        let t: TabulatedCurrent = serde_json::from_reader(file)
+            .with_context(|| format!("parsing tide data {}", path.display()))?;
+        anyhow::ensure!(
+            !t.u_east.is_empty() && t.u_east.len() == t.v_north.len() && t.dt_s > 0.0,
+            "tide data {} must have matching non-empty u/v and dt_s>0",
+            path.display()
+        );
+        Ok(t)
+    }
+}
+
+impl CurrentModel for TabulatedCurrent {
+    fn sample(&mut self, t: f64) -> (f64, f64) {
+        let n = self.u_east.len();
+        let f = (t / self.dt_s).clamp(0.0, (n - 1) as f64);
+        let i = f.floor() as usize;
+        if i + 1 >= n {
+            return (self.u_east[n - 1], self.v_north[n - 1]);
+        }
+        let frac = f - i as f64;
+        let lerp = |a: f64, b: f64| a + (b - a) * frac;
+        (
+            lerp(self.u_east[i], self.u_east[i + 1]),
+            lerp(self.v_north[i], self.v_north[i + 1]),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,6 +133,20 @@ mod tests {
         // Three-quarter period: peak ebb toward -x.
         let (xe, _) = m.sample(3.0 * p / 4.0);
         assert!((xe + 2.0).abs() < 1e-9, "ebb peak {}", xe);
+    }
+
+    #[test]
+    fn tabulated_current_interpolates_and_clamps() {
+        let json = r#"{"dt_s":100.0,"u_east":[0.0,1.0,2.0],"v_north":[0.0,0.0,0.0]}"#;
+        let mut t: TabulatedCurrent = serde_json::from_str(json).unwrap();
+        assert_eq!(t.sample(0.0), (0.0, 0.0));
+        assert_eq!(t.sample(50.0), (0.5, 0.0)); // halfway between sample 0 and 1
+        assert_eq!(t.sample(100.0), (1.0, 0.0));
+        assert_eq!(t.sample(150.0), (1.5, 0.0));
+        // Past the end → hold last sample.
+        assert_eq!(t.sample(999.0), (2.0, 0.0));
+        // Before the start → hold first.
+        assert_eq!(t.sample(-10.0), (0.0, 0.0));
     }
 
     #[test]
