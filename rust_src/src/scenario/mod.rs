@@ -6,7 +6,7 @@ use std::path::Path;
 use crate::autopilot::RouteAutopilot;
 use crate::chart::Chart;
 use crate::config::{Config, Invariants};
-use crate::current_model::{CurrentModel, NoCurrent, TidalStream};
+use crate::current_model::{CurrentModel, NoCurrent, TabulatedCurrent, TidalStream};
 use crate::physics::forces::Environment;
 use crate::physics::solve::initial_state;
 use crate::route::{Route, WindOverride};
@@ -66,6 +66,7 @@ pub fn scenario_route(
     wind_override: Option<WindOverride>,
     variance: Option<WindVariance>,
     tide: Option<TidalParams>,
+    tide_data: Option<&Path>,
     crab: bool,
     solver: Solver,
 ) -> Result<RouteRun> {
@@ -95,12 +96,18 @@ pub fn scenario_route(
         _ => Box::new(ConstantWind::new(env.true_wind)),
     };
 
-    // Build the tidal-current model. peak_speed == 0 → still water.
-    let mut current_model: Box<dyn CurrentModel> = match tide {
-        Some(p) if p.peak_speed != 0.0 => {
-            Box::new(TidalStream::new(p.peak_speed, p.axis_rad, p.period_s, p.phase_rad))
+    // Build the tidal-current model. A --tide-data cache (real CMEMS
+    // time series) wins; else the analytic stream if peak_speed != 0;
+    // else still water.
+    let mut current_model: Box<dyn CurrentModel> = if let Some(path) = tide_data {
+        Box::new(TabulatedCurrent::load(path)?)
+    } else {
+        match tide {
+            Some(p) if p.peak_speed != 0.0 => {
+                Box::new(TidalStream::new(p.peak_speed, p.axis_rad, p.period_s, p.phase_rad))
+            }
+            _ => Box::new(NoCurrent),
         }
-        _ => Box::new(NoCurrent),
     };
 
     let mut autopilot =

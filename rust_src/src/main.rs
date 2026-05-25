@@ -79,6 +79,11 @@ struct Cli {
     #[arg(long, default_value_t = 0xC0FFEE_u64)]
     wind_seed: u64,
 
+    /// Real tidal-current time series (JSON from scripts/fetch_tides.py).
+    /// Takes precedence over the analytic --tide-* stream.
+    #[arg(long)]
+    tide_data: Option<PathBuf>,
+
     /// Inner ODE solver: `dopri5` (adaptive, accurate, may fail with
     /// StiffnessDetected on aggressive IOM dynamics) or `rk4`
     /// (fixed-step, no stiffness check, trades accuracy for robustness).
@@ -161,6 +166,7 @@ fn main() -> Result<()> {
                 wind_override,
                 Some(variance),
                 Some(tide),
+                cli.tide_data.as_deref(),
                 cli.crab,
                 solver,
             )?;

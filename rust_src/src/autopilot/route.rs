@@ -126,7 +126,7 @@ impl Autopilot for RouteAutopilot {
 
         let desired = match self
             .follower
-            .update(obs.t, obs.pos_x, obs.pos_y, tw)
+            .update(obs.t, obs.pos_x, obs.pos_y, tw, obs.current)
         {
             Some(h) => h,
             None => {
@@ -229,7 +229,8 @@ mod tests {
             xte_lookahead: 15.0,
             min_tack_duration_s: 3.0,
             wind: None,
-            waypoints: vec![Waypoint { x: 0.0, y: 0.0 }, Waypoint { x: 0.0, y: 100.0 }],
+            waypoints: vec![Waypoint { x: 0.0, y: 0.0, gate: false }, Waypoint { x: 0.0, y: 100.0, gate: false }],
+            gate_open_along_current: 0.0,
             loop_route: false,
         }
     }
