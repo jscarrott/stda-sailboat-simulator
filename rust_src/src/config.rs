@@ -17,6 +17,10 @@ pub struct Config {
     pub controller_gains: Option<ControllerGains>,
 }
 
+fn default_wave_resistance_weight() -> f64 {
+    1.0
+}
+
 #[derive(Deserialize, Debug, Clone, Copy)]
 pub struct ControllerGains {
     pub kp: f64,
@@ -34,6 +38,13 @@ pub struct BoatCfg {
     pub height_bouyancy: f64,
     pub lateral_area: f64,
     pub waterline_area: f64,
+    /// Wave-resistance weight c_wr (paper eq. 8). Scales the dominant
+    /// hull wave-making drag, which otherwise caps top speed. Defaults
+    /// to 1.0 (the original hardcoded value); the paper flags this as a
+    /// parameter that should be identified from real data, so it's the
+    /// natural knob for fitting a speed polar.
+    #[serde(default = "default_wave_resistance_weight")]
+    pub wave_resistance_weight: f64,
     pub distance_cog_sail_pressure_point: f64,
     pub distance_cog_keel_pressure_point: f64,
     pub distance_cog_rudder: f64,
@@ -149,7 +160,7 @@ impl Invariants {
     pub fn from_config(cfg: &Config) -> Self {
         let b = &cfg.boat;
         let e = &cfg.environment;
-        let wave_impedance = (e.water_density / 2.0) * b.lateral_area;
+        let wave_impedance = b.wave_resistance_weight * (e.water_density / 2.0) * b.lateral_area;
         let hydrostatic_eff_x =
             b.height_bouyancy + (e.water_density / b.mass) * b.geometrical_moi_x;
         let hydrostatic_eff_y =
