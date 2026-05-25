@@ -1,0 +1,12 @@
+name: crossing
+acceptance_radius: 150.0
+close_hauled_angle_deg: 45.0
+xte_lookahead: 100.0
+min_tack_duration_s: 30.0
+# Planner input: just start (Ilfracombe harbour) and destination
+# (NE of Lundy). `--scenario plan` finds the path between them.
+wind: { direction_deg: 45.0, speed: 6.0 }
+waypoints:
+  - { x: 38900.0, y: 4100.0 }   # start: Ilfracombe harbour mouth
+  - { x:  3000.0, y: 3800.0 }   # dest: NE of Lundy
+loop: false

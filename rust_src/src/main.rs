@@ -11,6 +11,7 @@ mod config;
 mod controller;
 mod current_model;
 mod physics;
+mod planner;
 mod plot;
 mod route;
 mod sail;
@@ -24,7 +25,7 @@ use std::path::PathBuf;
 
 use config::Config;
 use route::WindOverride;
-use scenario::{scenario_polar, scenario_route, Solver, TidalParams, WindVariance};
+use scenario::{scenario_plan, scenario_polar, scenario_route, Solver, TidalParams, WindVariance};
 
 #[derive(Parser, Debug)]
 #[command(name = "sailboat_sim", version, about = "6-DOF sailboat simulator")]
@@ -206,7 +207,43 @@ fn main() -> Result<()> {
                 println!("  {:>7.0}  {:>9.2}  {:>8.2}  {}", twa, sp, sp * 1.94384, pos);
             }
         }
-        other => bail!("unknown scenario {other:?}; supported: route, polar"),
+        "plan" => {
+            let route_path = cli
+                .route
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("--route <path> (start+dest+wind) is required for --scenario plan"))?;
+            let wind_override = match (cli.wind_deg, cli.wind_speed) {
+                (Some(d), Some(s)) => Some(WindOverride { direction_deg: d, speed: s }),
+                (None, None) => None,
+                _ => bail!("--wind-deg and --wind-speed must be set together"),
+            };
+            let tide = TidalParams {
+                peak_speed: cli.tide_peak,
+                axis_rad: (90.0 - cli.tide_flood_deg).to_radians(),
+                period_s: cli.tide_period_h * 3600.0,
+                phase_rad: cli.tide_phase_deg.to_radians(),
+            };
+            let solver = match cli.solver.as_str() {
+                "dopri5" => Solver::Dopri5,
+                "rk4" => Solver::Rk4,
+                other => bail!("unknown --solver {other:?}; supported: dopri5, rk4"),
+            };
+            let out = cli.out.unwrap_or_else(|| {
+                let stem = route_path.file_stem().and_then(|s| s.to_str()).unwrap_or("route");
+                PathBuf::from(format!("routes/{}_planned.yaml", stem))
+            });
+            scenario_plan(
+                &cfg,
+                route_path,
+                cli.chart.as_deref(),
+                wind_override,
+                Some(tide),
+                cli.tide_data.as_deref(),
+                solver,
+                &out,
+            )?;
+        }
+        other => bail!("unknown scenario {other:?}; supported: route, polar, plan"),
     }
     Ok(())
 }
