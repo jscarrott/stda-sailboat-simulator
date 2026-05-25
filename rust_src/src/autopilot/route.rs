@@ -236,10 +236,11 @@ mod tests {
             xte_lookahead: 15.0,
             min_tack_duration_s: 3.0,
             wind: None,
-            waypoints: vec![Waypoint { x: 0.0, y: 0.0, gate: false }, Waypoint { x: 0.0, y: 100.0, gate: false }],
+            waypoints: vec![Waypoint { x: 0.0, y: 0.0, gate: false, soft: false }, Waypoint { x: 0.0, y: 100.0, gate: false, soft: false }],
             gate_open_along_current: 0.0,
             gate_lead_time_s: 0.0,
             gate_min_fair_window_s: 0.0,
+            fly_by_radius: 0.0,
             loop_route: false,
         }
     }
