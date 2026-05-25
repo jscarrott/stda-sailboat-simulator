@@ -157,14 +157,19 @@
 <tr><td><span class="pill done">done</span></td><td>0. Sim parity</td><td>Rust port matches Python traces on controller, sail, ODE.</td><td>laptop</td></tr>
 <tr><td><span class="pill done">done</span></td><td>1. Route &amp; chart</td><td>OSM coastline cached; Ilfracombe round trip plans cleanly in sim.</td><td>laptop</td></tr>
 <tr><td><span class="pill done">done</span></td><td>2. Trait boundary</td><td>Sim and autopilot decoupled; trait is dyn-compatible.</td><td>laptop</td></tr>
+<tr><td><span class="pill done">done</span></td><td>2b. Speed calibration (provisional)</td><td>Polar harness (<code>--scenario polar</code>) built; IOM hull rebuilt by geometric scaling of the 4&nbsp;m reference; wave-resistance weight <code>c_wr</code> curve-fit so the polar matches typical IOM speeds (~1.1&nbsp;m/s upwind, ~1.2&nbsp;m/s reaching) at 4&nbsp;m/s wind. <strong>Fit to textbook numbers, not measured data &mdash; must be re-fit against a real polar (phase&nbsp;6).</strong></td><td>laptop</td></tr>
 <tr><td><span class="pill now">now</span></td><td>3. Source hull</td><td>Buy a used IOM with at least A rig. Inspect for keel/seal damage.</td><td>UK marketplace</td></tr>
 <tr><td><span class="pill next">next</span></td><td>4. Hardware runner</td><td>Write a sibling to <code>simulate()</code> that reads GPS+IMU+wind over I&sup2;C/UART and drives servos via PWM. Feeds the same <code>Observation</code>/<code>Command</code> as the sim.</td><td>workbench</td></tr>
 <tr><td><span class="pill next">next</span></td><td>5. Faked-GPS HiL</td><td>Replay sim-generated Observations into the real MCU; verify servos move as the sim's recorded commands say they should. No water yet.</td><td>workbench</td></tr>
-<tr><td><span class="pill next">next</span></td><td>6. Pond shakedown</td><td>Manual launch with RC failsafe armed. Tune controller gains against real boat dynamics.</td><td>any pond / Roadford Lake</td></tr>
+<tr><td><span class="pill next">next</span></td><td>6. Pond shakedown + <strong>measure the polar</strong></td><td>Manual launch with RC failsafe armed. Tune controller gains against real boat dynamics. <strong>Log GPS speed at a spread of wind angles and re-fit <code>c_wr</code> + damping to the measured polar</strong>, replacing the provisional curve-fit from phase&nbsp;2b. This is the step the source paper itself flags as missing.</td><td>any pond / Roadford Lake</td></tr>
 <tr><td><span class="pill next">next</span></td><td>7. Sheltered coastal trial</td><td>Short route inside Ilfracombe harbour or Combe Martin bay on a calm day, with a chase kayak.</td><td>North Devon</td></tr>
 <tr><td><span class="pill stretch">stretch</span></td><td>8. Lundy passage</td><td>Weather-window dependent. Probably wants a bigger hull and a chase RIB; the autopilot code itself doesn't change.</td><td>Bristol Channel</td></tr>
 </tbody>
 </table>
+
+<div class="callout">
+<strong>On the speed calibration.</strong> The simulator is a faithful port of Kohaut et&nbsp;al. (2018), whose stated scope is dynamic <em>behaviour</em>, not absolute speed &mdash; the paper says &ldquo;the precise prediction of the actual reachable velocities are of minor interest&rdquo; and that <code>c_wr</code> and the damping coefficients &ldquo;still need&rdquo; identification from recorded data. The current IOM speeds (~1.1&nbsp;m/s upwind, ~1.2&nbsp;m/s reaching at 4&nbsp;m/s wind) come from curve-fitting <code>c_wr</code> to published typical IOM figures, so the polar <em>shape</em> and magnitudes are plausible but not validated. One afternoon logging GPS speed-vs-wind-angle on the real boat (phase&nbsp;6) turns this into a proper fit. Above ~5&nbsp;m/s the model also goes unstable (overpowered / heel-control), so treat it as calibrated for moderate conditions only.
+</div>
 
 <h2>Where it could fail</h2>
 

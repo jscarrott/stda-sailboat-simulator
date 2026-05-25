@@ -44,6 +44,17 @@ boat: {
     height_bouyancy:  0.0375,            # 0.15 ×λ
     lateral_area:     0.156,             # 2.5 ×λ^2
     waterline_area:   0.10,              # 1.6 ×λ^2
+    wave_resistance_weight: 0.06,        # c_wr (paper eq.8). CURVE-FIT,
+                                          # NOT measured: chosen so the
+                                          # polar matches typical IOM
+                                          # speeds at 4 m/s wind (upwind
+                                          # ~1.1, reaching ~1.2 m/s). The
+                                          # paper flags c_wr + damping as
+                                          # needing real-data ID — replace
+                                          # this with a fit to a measured
+                                          # polar from the actual boat.
+
+
 
     distance_cog_sail_pressure_point:  0.1075,  # 0.43 ×λ
     distance_cog_keel_pressure_point:  0.06,    # 0.24 ×λ
