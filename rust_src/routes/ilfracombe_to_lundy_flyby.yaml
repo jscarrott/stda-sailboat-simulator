@@ -1,0 +1,41 @@
+name: ilfracombe_to_lundy_flyby
+acceptance_radius: 150.0
+close_hauled_angle_deg: 45.0
+xte_lookahead: 100.0
+min_tack_duration_s: 30.0
+# Pass within 1.5 km of the soft channel waypoints (turn-anticipation /
+# loose corridor); hard waypoints still use the 150 m acceptance circle.
+fly_by_radius: 1500.0
+
+# Fly-by variant of ilfracombe_to_lundy: the channel-crossing corridor
+# waypoints (2-4 out, 13-15 back) are marked `soft: true` — the boat
+# only has to pass them, not hit them, and steers pure-pursuit so a
+# favourable tide bows the track instead of being fought back onto the
+# rhumb. The circumnavigation waypoints (5-12) and the harbour mouth
+# stay hard so the circuit shape and the start/finish are precise.
+wind:
+  direction_deg: 45.0
+  speed: 6.0
+
+waypoints:
+  # Outbound passage from Ilfracombe
+  - { x: 38900.0, y:  4100.0 }                 # 1. harbour mouth (start, hard)
+  - { x: 38000.0, y:  5500.0, soft: true }     # 2. clear Capstone
+  - { x: 25000.0, y:  5200.0, soft: true }     # 3. mid-channel
+  - { x: 10000.0, y:  4500.0, soft: true }     # 4. approaching Lundy
+  - { x:  3000.0, y:  3800.0 }                 # 5. Lundy NE corner (hard)
+  # Counter-clockwise circumnavigation of Lundy (hard — hold the circuit)
+  - { x: -1000.0, y:  3600.0 }                 # 6. NW past the north tip
+  - { x: -1300.0, y:  1500.0 }                 # 7. West side
+  - { x: -1300.0, y: -1500.0 }                 # 8. SW corner
+  - { x:   400.0, y: -2100.0 }                 # 9. South of South Light
+  - { x:  1500.0, y: -1500.0 }                 # 10. SE corner
+  - { x:  2000.0, y:  1500.0 }                 # 11. East side
+  - { x:  3000.0, y:  3800.0 }                 # 12. close the circumnav
+  # Return passage to Ilfracombe
+  - { x: 10000.0, y:  4500.0, soft: true }     # 13. re-enter the channel
+  - { x: 25000.0, y:  5200.0, soft: true }     # 14. mid-channel
+  - { x: 38000.0, y:  5500.0, soft: true }     # 15. approach Ilfracombe
+  - { x: 38900.0, y:  4100.0 }                 # 16. harbour mouth (finish, hard)
+
+loop: false

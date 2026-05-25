@@ -240,11 +240,15 @@ fn report_route_progress(run: &scenario::RouteRun) {
 
     // Closest approach to each waypoint (in sequence, so a later
     // waypoint's scan starts from where the previous one was captured).
-    let r = run.route.acceptance_radius;
+    let accept = run.route.acceptance_radius;
+    let fly_by = run.route.fly_by_radius;
     let mut captured = 0;
     let mut scan_from = 0usize;
-    println!("route progress (acceptance radius {:.0} m):", r);
+    println!("route progress (acceptance radius {:.0} m):", accept);
     for (wi, wp) in run.route.waypoints.iter().enumerate().skip(1) {
+        // Soft waypoints are "captured" by passing within the larger
+        // fly-by radius, not the tight acceptance circle.
+        let r = if wp.soft { accept.max(fly_by) } else { accept };
         let mut closest = f64::INFINITY;
         let mut capture_idx = None;
         for i in scan_from..track.len() {

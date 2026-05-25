@@ -17,6 +17,16 @@ pub struct Waypoint {
     /// final waypoint (no next leg). Defaults to false.
     #[serde(default)]
     pub gate: bool,
+    /// Fly-by (soft) waypoint: the boat doesn't have to hit it, only
+    /// pass it. The leg advances as soon as the boat crosses the
+    /// waypoint's perpendicular line (along-track progress past it), so
+    /// it never doubles back to nail a point the tide pushed it past and
+    /// it cuts the corner onto the next leg. Steering stays LOS+XTE
+    /// (robust against a foul set); actively exploiting a favourable
+    /// tide is a separate routing step. Hard waypoints (default) need
+    /// the acceptance circle.
+    #[serde(default)]
+    pub soft: bool,
 }
 
 /// Wind override matching the Python `sim_params_config.yaml`
@@ -88,6 +98,14 @@ pub struct Route {
     /// Needs a forecastable current model to have any effect.
     #[serde(default)]
     pub gate_min_fair_window_s: f64,
+    /// Turn-anticipation radius (m) for fly-by (soft) waypoints: the leg
+    /// advances as soon as the boat is within this distance of a soft
+    /// waypoint, so it cuts the corner onto the next leg instead of
+    /// sailing all the way to the point. 0 = no anticipation (advance
+    /// only on along-track pass or the acceptance circle). Ignored for
+    /// hard waypoints.
+    #[serde(default)]
+    pub fly_by_radius: f64,
     pub waypoints: Vec<Waypoint>,
     #[serde(rename = "loop", default = "default_loop")]
     pub loop_route: bool,
@@ -250,9 +268,28 @@ impl RouteFollower {
         }
 
         // ----- Capture -----
+        let prev_wp = self.route.waypoints[self.leg_index];
         let target = self.route.waypoints[self.leg_index + 1];
         let dist_to_target = ((target.x - pos_x).powi(2) + (target.y - pos_y).powi(2)).sqrt();
-        if dist_to_target < self.route.acceptance_radius {
+        // Fly-by: a soft waypoint is "captured" the moment the boat
+        // crosses its perpendicular line (along-track progress past it),
+        // so it never doubles back to nail a point the tide pushed it
+        // past. Hard waypoints need the acceptance circle.
+        let passed_soft = target.soft && {
+            let lvx = target.x - prev_wp.x;
+            let lvy = target.y - prev_wp.y;
+            let leg_len = lvx.hypot(lvy).max(1e-9);
+            ((pos_x - prev_wp.x) * lvx + (pos_y - prev_wp.y) * lvy) / leg_len >= leg_len
+        };
+        // Soft waypoints also advance within the larger fly-by radius
+        // (turn anticipation → corner cut); hard ones need the
+        // acceptance circle.
+        let capture_radius = if target.soft {
+            self.route.acceptance_radius.max(self.route.fly_by_radius)
+        } else {
+            self.route.acceptance_radius
+        };
+        if dist_to_target < capture_radius || passed_soft {
             // Tidal gate: hold here until the stream turns fair for the
             // next leg. Loiter by steering back at the gate waypoint;
             // do not advance the leg until the gate opens. With a
@@ -301,7 +338,7 @@ impl RouteFollower {
         let in_no_go = off_wind.abs() < close_hauled_rad;
 
         if !in_no_go {
-            // Goal is outside the no-go cone — direct steering.
+            // Goal is outside the no-go cone — direct steering (LOS+XTE).
             self.tack = Tack::None;
             return Some(chi_los);
         }
@@ -368,10 +405,11 @@ mod tests {
             xte_lookahead: 15.0,
             min_tack_duration_s: 3.0,
             wind: None,
-            waypoints: vec![Waypoint { x: ax, y: ay, gate: false }, Waypoint { x: bx, y: by, gate: false }],
+            waypoints: vec![Waypoint { x: ax, y: ay, gate: false, soft: false }, Waypoint { x: bx, y: by, gate: false, soft: false }],
             gate_open_along_current: 0.0,
             gate_lead_time_s: 0.0,
             gate_min_fair_window_s: 0.0,
+            fly_by_radius: 0.0,
             loop_route: false,
         }
     }
@@ -382,7 +420,7 @@ mod tests {
         // wp1 is a tidal gate; it should hold until the current has a
         // positive eastward (along-leg2) component.
         let mut route = straight_route("gated", 0.0, 0.0, 100.0, 0.0);
-        route.waypoints.push(Waypoint { x: 200.0, y: 0.0, gate: false });
+        route.waypoints.push(Waypoint { x: 200.0, y: 0.0, gate: false, soft: false });
         route.waypoints[1].gate = true; // gate at (100,0); next leg is +x
         let wind = wind_from_deg(5.0, 90.0); // crosswind, no tacking
         let mut rf = RouteFollower::new(route);
@@ -407,7 +445,7 @@ mod tests {
         // Same gate (next leg due east, +x). Reversing E/W stream with a
         // 100 s period: at t=0 it's foul, but it turns fair ~25 s later.
         let mut route = straight_route("gated_fc", 0.0, 0.0, 100.0, 0.0);
-        route.waypoints.push(Waypoint { x: 200.0, y: 0.0, gate: false });
+        route.waypoints.push(Waypoint { x: 200.0, y: 0.0, gate: false, soft: false });
         route.waypoints[1].gate = true;
         route.gate_lead_time_s = 30.0; // look 30 s ahead
         let wind = wind_from_deg(5.0, 90.0);
@@ -442,7 +480,7 @@ mod tests {
         // window. At t=40 it's fair NOW but turns foul at t=50 (only 10 s
         // left) → must hold. At t=2 the whole 0..40 window is fair → open.
         let mut route = straight_route("gated_win", 0.0, 0.0, 100.0, 0.0);
-        route.waypoints.push(Waypoint { x: 200.0, y: 0.0, gate: false });
+        route.waypoints.push(Waypoint { x: 200.0, y: 0.0, gate: false, soft: false });
         route.waypoints[1].gate = true;
         route.gate_min_fair_window_s = 40.0;
         let wind = wind_from_deg(5.0, 90.0);
@@ -476,6 +514,30 @@ mod tests {
         // Once departed it follows the leg normally on subsequent ticks.
         rf.update(20.0, 1.0, 0.0, wind, (0.5, 0.0), &TideForecast::None);
         assert_eq!(rf.leg_index, 0); // still on the first leg, just sailing it
+    }
+
+    #[test]
+    fn fly_by_advances_on_pass_not_circle() {
+        // A(0,0) -> B(100,0) [soft] -> C(200,0). Crosswind (beam reach).
+        let mut route = straight_route("flyby", 0.0, 0.0, 100.0, 0.0);
+        route.waypoints.push(Waypoint { x: 200.0, y: 0.0, gate: false, soft: false });
+        route.waypoints[1].soft = true;
+        let wind = wind_from_deg(5.0, 90.0);
+        let mut rf = RouteFollower::new(route);
+
+        // Boat at (105, 30): 30 m off B (well outside the 5 m acceptance)
+        // but past B along-track → a fly-by advances to the B->C leg
+        // rather than doubling back to nail B.
+        rf.update(0.0, 105.0, 30.0, wind, (0.0, 0.0), &TideForecast::None);
+        assert_eq!(rf.leg_index, 1, "soft waypoint advances on along-track pass");
+
+        // A hard waypoint in the same spot would NOT advance (still > 5 m
+        // away, not within acceptance).
+        let mut route2 = straight_route("hard", 0.0, 0.0, 100.0, 0.0);
+        route2.waypoints.push(Waypoint { x: 200.0, y: 0.0, gate: false, soft: false });
+        let mut rf2 = RouteFollower::new(route2);
+        rf2.update(0.0, 105.0, 30.0, wind, (0.0, 0.0), &TideForecast::None);
+        assert_eq!(rf2.leg_index, 0, "hard waypoint needs the acceptance circle");
     }
 
     #[test]
@@ -555,13 +617,14 @@ mod tests {
             min_tack_duration_s: 3.0,
             wind: None,
             waypoints: vec![
-                Waypoint { x: 0.0, y: 0.0, gate: false },
-                Waypoint { x: 50.0, y: 0.0, gate: false },
-                Waypoint { x: 100.0, y: 0.0, gate: false },
+                Waypoint { x: 0.0, y: 0.0, gate: false, soft: false },
+                Waypoint { x: 50.0, y: 0.0, gate: false, soft: false },
+                Waypoint { x: 100.0, y: 0.0, gate: false, soft: false },
             ],
             gate_open_along_current: 0.0,
             gate_lead_time_s: 0.0,
             gate_min_fair_window_s: 0.0,
+            fly_by_radius: 0.0,
             loop_route: false,
         };
         let mut rf = RouteFollower::new(route);
