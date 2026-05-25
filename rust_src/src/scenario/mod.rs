@@ -5,7 +5,7 @@ use std::path::Path;
 
 use std::f64::consts::PI;
 
-use crate::autopilot::RouteAutopilot;
+use crate::autopilot::{Obstacle, RouteAutopilot};
 use crate::chart::Chart;
 use crate::config::{Config, Invariants};
 use crate::current_model::{CurrentModel, NoCurrent, TabulatedCurrent, TideForecast, TidalStream};
@@ -114,8 +114,23 @@ pub fn scenario_route(
     };
 
     let forecast = current_model.forecaster();
-    let mut autopilot =
-        RouteAutopilot::new(cfg, route.clone(), SAMPLE_TIME, SAIL_SAMPLE_TIME, crab, forecast);
+    // Hand the follower a coarse outline of the coastline so it can deflect
+    // away from a lee shore the offline route didn't account for (tidal set,
+    // wind shifts). Dense chart polylines (Lundy has 3000+ raw vertices) are
+    // simplified so the per-tick lookahead test stays cheap.
+    let obstacles = chart
+        .as_ref()
+        .map(build_obstacles)
+        .unwrap_or_default();
+    let mut autopilot = RouteAutopilot::new(
+        cfg,
+        route.clone(),
+        SAMPLE_TIME,
+        SAIL_SAMPLE_TIME,
+        crab,
+        forecast,
+        obstacles,
+    );
     let mut x0 = initial_state(cfg, true);
     if let Some(start) = route.waypoints.first() {
         x0[POS_X] = start.x;
@@ -137,6 +152,29 @@ pub fn scenario_route(
         solver,
     )?;
     Ok(RouteRun { result, route, chart })
+}
+
+/// Turn chart polygons into simplified obstacles for the follower's
+/// reactive land avoidance. Each polyline is decimated with RDP (50 m
+/// tolerance — coarse enough to keep the per-tick lookahead cheap, fine
+/// enough to preserve headlands and islets), and degenerate results are
+/// dropped.
+fn build_obstacles(chart: &Chart) -> Vec<Obstacle> {
+    chart
+        .polygons
+        .iter()
+        .filter_map(|poly| {
+            let pts: Vec<(f64, f64)> = poly.points.iter().map(|p| (p[0], p[1])).collect();
+            if pts.len() < 2 {
+                return None;
+            }
+            let simple = simplify(&pts, 50.0);
+            if simple.len() < 2 {
+                return None;
+            }
+            Some(Obstacle::new(simple, poly.closed))
+        })
+        .collect()
 }
 
 /// Measure the boat's steady-state speed polar: for each true wind

@@ -30,6 +30,36 @@ const MAX_CRAB_RAD: f64 = 40.0 * PI / 180.0;
 /// dead-downwind doesn't gybe-slam the rig side-to-side. ~25°.
 const SAIL_SIDE_DEADBAND: f64 = 0.44;
 
+/// How far ahead (m) the follower looks for land. If the commanded
+/// heading would put the boat into land within this distance, it
+/// deflects to the nearest clear heading. Chosen smaller than typical
+/// off-the-rocks waypoint clearances so legitimate close approaches
+/// aren't fought, but large enough to react to tidal set.
+const LAND_LOOKAHEAD_M: f64 = 300.0;
+
+/// A coastline obstacle for reactive avoidance: a simplified polyline
+/// (closed for islands, open for the mainland) plus its bounding box
+/// for a cheap reject.
+#[derive(Clone)]
+pub struct Obstacle {
+    pub pts: Vec<(f64, f64)>,
+    pub closed: bool,
+    pub bbox: (f64, f64, f64, f64), // xmin, xmax, ymin, ymax
+}
+
+impl Obstacle {
+    pub fn new(pts: Vec<(f64, f64)>, closed: bool) -> Self {
+        let mut bbox = (f64::INFINITY, f64::NEG_INFINITY, f64::INFINITY, f64::NEG_INFINITY);
+        for &(x, y) in &pts {
+            bbox.0 = bbox.0.min(x);
+            bbox.1 = bbox.1.max(x);
+            bbox.2 = bbox.2.min(y);
+            bbox.3 = bbox.3.max(y);
+        }
+        Obstacle { pts, closed, bbox }
+    }
+}
+
 pub struct RouteAutopilot {
     follower: RouteFollower,
     heading_controller: HeadingController,
@@ -49,6 +79,9 @@ pub struct RouteAutopilot {
     /// current model). `TideForecast::None` → gates use the present
     /// current only.
     forecast: TideForecast,
+    /// Simplified coastline obstacles for reactive land avoidance. Empty
+    /// → no avoidance (open-water-only runs, all unit tests).
+    obstacles: Vec<Obstacle>,
 }
 
 impl RouteAutopilot {
@@ -59,6 +92,7 @@ impl RouteAutopilot {
         sail_resample_period_s: f64,
         crab_enabled: bool,
         forecast: TideForecast,
+        obstacles: Vec<Obstacle>,
     ) -> Self {
         Self {
             follower: RouteFollower::new(route),
@@ -70,7 +104,64 @@ impl RouteAutopilot {
             sail_side: 1.0,
             crab_enabled,
             forecast,
+            obstacles,
         }
+    }
+
+    /// If steering `heading` from `pos` would run the boat into a coastline
+    /// obstacle within `LAND_LOOKAHEAD_M`, return the nearest clear heading
+    /// (smallest symmetric deflection that clears). Otherwise return
+    /// `heading` unchanged. No obstacles → no-op.
+    fn avoid_land(&self, pos: (f64, f64), heading: f64) -> f64 {
+        if self.obstacles.is_empty() || !self.heading_hits_land(pos, heading) {
+            return heading;
+        }
+        let step = 10.0_f64.to_radians();
+        let max = 100.0_f64.to_radians();
+        let mut delta = step;
+        while delta <= max + 1e-9 {
+            // Prefer the smaller-magnitude deflection; try both sides at
+            // each step so we turn the least amount that clears.
+            for &sign in &[1.0_f64, -1.0] {
+                let h = heading + sign * delta;
+                if !self.heading_hits_land(pos, h) {
+                    return h;
+                }
+            }
+            delta += step;
+        }
+        // Boxed in within ±100°: hold the commanded heading rather than
+        // spin; the controller's other terms still apply.
+        heading
+    }
+
+    /// True if the lookahead segment from `pos` along `heading` crosses any
+    /// obstacle polyline. Bounding-box pre-filter keeps open water cheap.
+    fn heading_hits_land(&self, pos: (f64, f64), heading: f64) -> bool {
+        let (x0, y0) = pos;
+        let x1 = x0 + LAND_LOOKAHEAD_M * heading.cos();
+        let y1 = y0 + LAND_LOOKAHEAD_M * heading.sin();
+        let (sxmin, sxmax) = (x0.min(x1), x0.max(x1));
+        let (symin, symax) = (y0.min(y1), y0.max(y1));
+        for ob in &self.obstacles {
+            let (bxmin, bxmax, bymin, bymax) = ob.bbox;
+            if sxmax < bxmin || sxmin > bxmax || symax < bymin || symin > bymax {
+                continue;
+            }
+            let n = ob.pts.len();
+            if n < 2 {
+                continue;
+            }
+            let edges = if ob.closed { n } else { n - 1 };
+            for i in 0..edges {
+                let a = ob.pts[i];
+                let b = ob.pts[(i + 1) % n];
+                if segments_intersect(x0, y0, x1, y1, a.0, a.1, b.0, b.1) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     pub fn route(&self) -> &Route {
@@ -107,6 +198,24 @@ fn crab_heading(desired_cog: f64, current: (f64, f64), water_speed: f64) -> f64 
 /// dead-astern (gybe). Away from those bands the side follows the wind:
 /// positive apparent angle → +1, negative → −1 (matching the old
 /// `sign(apparent_angle)` convention).
+/// Proper segment-segment intersection test (excludes collinear touching).
+fn segments_intersect(
+    ax: f64, ay: f64, bx: f64, by: f64,
+    cx: f64, cy: f64, dx: f64, dy: f64,
+) -> bool {
+    let d1 = cross3(cx, cy, dx, dy, ax, ay);
+    let d2 = cross3(cx, cy, dx, dy, bx, by);
+    let d3 = cross3(ax, ay, bx, by, cx, cy);
+    let d4 = cross3(ax, ay, bx, by, dx, dy);
+    ((d1 > 0.0 && d2 < 0.0) || (d1 < 0.0 && d2 > 0.0))
+        && ((d3 > 0.0 && d4 < 0.0) || (d3 < 0.0 && d4 > 0.0))
+}
+
+/// Cross product (p2-p1) x (p3-p1).
+fn cross3(p1x: f64, p1y: f64, p2x: f64, p2y: f64, p3x: f64, p3y: f64) -> f64 {
+    (p2x - p1x) * (p3y - p1y) - (p2y - p1y) * (p3x - p1x)
+}
+
 fn next_sail_side(apparent_angle: f64, prev: f64) -> f64 {
     let a = apparent_angle.abs();
     if a <= SAIL_SIDE_DEADBAND || a >= PI - SAIL_SIDE_DEADBAND {
@@ -144,6 +253,14 @@ impl Autopilot for RouteAutopilot {
                 };
             }
         };
+
+        // Reactive land avoidance: deflect the desired course over ground
+        // away from any coastline within the lookahead before it's handed
+        // to crab/controller. The follower has no chart awareness; a fast
+        // (e.g. tide-assisted) crossing can arrive at a mark with the set
+        // pushing it onto the lee shore, and the planner's land avoidance
+        // only shapes the offline route, not the closed loop.
+        let desired = self.avoid_land((obs.pos_x, obs.pos_y), desired);
 
         // Crab compensation: treat the follower's output as the desired
         // course over ground and offset the commanded heading so the
@@ -281,15 +398,60 @@ mod tests {
 
     #[test]
     fn autopilot_signals_mission_complete_when_route_done() {
-        let mut ap = RouteAutopilot::new(&cfg(), straight_north_route(), 0.3, 2.0, true, TideForecast::None);
+        let mut ap = RouteAutopilot::new(&cfg(), straight_north_route(), 0.3, 2.0, true, TideForecast::None, vec![]);
         // Step once well inside acceptance radius of the only target.
         let cmd = ap.step(&obs(0.0, 0.0, 99.0));
         assert!(cmd.mission_complete, "captured final waypoint should end mission");
     }
 
     #[test]
+    fn avoid_land_deflects_around_obstacle_and_passes_clear_water() {
+        // A wall straight ahead (east) of the boat at x = 100, spanning
+        // y ∈ [-200, 200] — wide enough that the 300 m lookahead pointed
+        // due east hits it.
+        let wall = Obstacle::new(
+            vec![(100.0, -200.0), (100.0, 200.0)],
+            false,
+        );
+        let ap = RouteAutopilot::new(
+            &cfg(),
+            straight_north_route(),
+            0.3,
+            2.0,
+            true,
+            TideForecast::None,
+            vec![wall],
+        );
+        // Heading due east (0 rad) from the origin runs into the wall.
+        assert!(ap.heading_hits_land((0.0, 0.0), 0.0));
+        let deflected = ap.avoid_land((0.0, 0.0), 0.0);
+        assert!((deflected - 0.0).abs() > 1e-6, "should deflect off the wall");
+        assert!(!ap.heading_hits_land((0.0, 0.0), deflected), "deflected heading must clear");
+        // Heading due north (π/2) runs parallel to the wall and never hits
+        // it → left unchanged.
+        let clear = std::f64::consts::PI / 2.0;
+        assert!(!ap.heading_hits_land((0.0, 0.0), clear));
+        assert_eq!(ap.avoid_land((0.0, 0.0), clear), clear);
+    }
+
+    #[test]
+    fn avoid_land_is_noop_without_obstacles() {
+        let ap = RouteAutopilot::new(
+            &cfg(),
+            straight_north_route(),
+            0.3,
+            2.0,
+            true,
+            TideForecast::None,
+            vec![],
+        );
+        assert_eq!(ap.avoid_land((0.0, 0.0), 1.234), 1.234);
+        assert!(!ap.heading_hits_land((0.0, 0.0), 0.0));
+    }
+
+    #[test]
     fn autopilot_emits_finite_rudder_and_sail() {
-        let mut ap = RouteAutopilot::new(&cfg(), straight_north_route(), 0.3, 2.0, true, TideForecast::None);
+        let mut ap = RouteAutopilot::new(&cfg(), straight_north_route(), 0.3, 2.0, true, TideForecast::None, vec![]);
         let cmd = ap.step(&obs(0.0, 0.0, 0.0));
         assert!(cmd.rudder_angle.is_finite());
         assert!(cmd.sail_angle.is_finite());
