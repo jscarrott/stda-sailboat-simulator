@@ -322,6 +322,36 @@ fn report_route_progress(run: &scenario::RouteRun) {
         max_speed
     );
 
+    // Land-incursion check: a verification counter for the follower's
+    // reactive land avoidance — flags any track points that fall inside a
+    // closed chart polygon (land). Split into the Lundy region (the lee
+    // shore the avoidance targets) and everything else.
+    if let Some(chart) = &run.chart {
+        let mut near_lundy = 0usize; // x < 2000 (the island region)
+        let mut elsewhere = 0usize;
+        for s in track.iter() {
+            for poly in &chart.polygons {
+                if poly.closed && point_in_polygon(s[POS_X], s[POS_Y], &poly.points) {
+                    if s[POS_X] < 2000.0 {
+                        near_lundy += 1;
+                    } else {
+                        elsewhere += 1;
+                    }
+                    break;
+                }
+            }
+        }
+        let total = near_lundy + elsewhere;
+        if total > 0 {
+            println!(
+                "  !! LAND INCURSION: {} track pts inside land ({} near Lundy, {} channel/islets)",
+                total, near_lundy, elsewhere
+            );
+        } else {
+            println!("  no land incursions (closed polygons; mainland is an open polyline, not checked)");
+        }
+    }
+
     if std::env::var("DUMP_TRACK").is_ok() {
         use state::YAW;
         let n = track.len();
@@ -344,4 +374,23 @@ fn report_route_progress(run: &scenario::RouteRun) {
             );
         }
     }
+}
+
+/// Even-odd ray-casting point-in-polygon test (polygon as [x,y] vertices).
+fn point_in_polygon(px: f64, py: f64, pts: &[[f64; 2]]) -> bool {
+    let n = pts.len();
+    if n < 3 {
+        return false;
+    }
+    let mut inside = false;
+    let mut j = n - 1;
+    for i in 0..n {
+        let (xi, yi) = (pts[i][0], pts[i][1]);
+        let (xj, yj) = (pts[j][0], pts[j][1]);
+        if ((yi > py) != (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi) {
+            inside = !inside;
+        }
+        j = i;
+    }
+    inside
 }
