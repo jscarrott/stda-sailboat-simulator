@@ -123,6 +123,19 @@ struct Cli {
     /// Override the output PNG path. Defaults to `figs/route_<name>.png`.
     #[arg(long)]
     out: Option<PathBuf>,
+
+    /// Experimental: re-route on a held tidal gate. If the boat waits at a
+    /// gate longer than `--replan-after-wait-s`, re-run the isochrone
+    /// planner from the current position+time (tide-aware) and sail the
+    /// new path instead of waiting out the missed window. Off by default;
+    /// enabling it measures the boat polar up front (a few short sims).
+    #[arg(long)]
+    replan_on_gate: bool,
+
+    /// Hold-time (s) at a tidal gate before re-routing kicks in (only used
+    /// with --replan-on-gate). Default ~ one semidiurnal half-cycle.
+    #[arg(long, default_value_t = 3600.0)]
+    replan_after_wait_s: f64,
 }
 
 fn main() -> Result<()> {
@@ -170,6 +183,7 @@ fn main() -> Result<()> {
                 cli.tide_data.as_deref(),
                 cli.crab,
                 solver,
+                cli.replan_on_gate.then_some(cli.replan_after_wait_s),
             )?;
             let out = cli.out.unwrap_or_else(|| {
                 PathBuf::from(format!("figs/route_{}.png", run.route.name))

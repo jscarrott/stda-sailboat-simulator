@@ -10,7 +10,7 @@ pub mod fixed_heading;
 pub mod route;
 
 pub use fixed_heading::FixedHeadingAutopilot;
-pub use route::{Obstacle, RouteAutopilot};
+pub use route::{Obstacle, ReplanContext, RouteAutopilot};
 
 /// World-frame wind sensed by the boat.
 ///

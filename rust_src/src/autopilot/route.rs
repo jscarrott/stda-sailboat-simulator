@@ -5,10 +5,12 @@
 use std::f64::consts::PI;
 
 use crate::autopilot::{Autopilot, Command, Observation};
+use crate::chart::Chart;
 use crate::config::Config;
 use crate::controller::HeadingController;
 use crate::current_model::TideForecast;
 use crate::physics::wind::{calculate_apparent_wind, TrueWind};
+use crate::planner::{plan, simplify, PlanConfig, Polar};
 use crate::route::{Route, RouteFollower, Tack};
 use crate::sail::sail_angle;
 
@@ -60,6 +62,36 @@ impl Obstacle {
     }
 }
 
+/// Everything the autopilot needs to re-run the offline isochrone planner
+/// from the boat's current position and time. Built once (the polar
+/// measurement is expensive) and handed to the autopilot via
+/// [`RouteAutopilot::enable_replanning`].
+pub struct ReplanContext {
+    polar: Polar,
+    chart: Option<Chart>,
+    /// Direction the wind blows FROM (math angle, rad) used for planning.
+    /// The nominal/mean wind, not the gusting instantaneous value.
+    wind_from: f64,
+    /// Re-route once a tidal gate has been held continuously this long (s).
+    after_wait_s: f64,
+    dest_radius: f64,
+    /// When the boat first started waiting at the current gate. Reset when
+    /// it stops waiting or after a replan fires.
+    wait_started_t: Option<f64>,
+}
+
+impl ReplanContext {
+    pub fn new(
+        polar: Polar,
+        chart: Option<Chart>,
+        wind_from: f64,
+        after_wait_s: f64,
+        dest_radius: f64,
+    ) -> Self {
+        Self { polar, chart, wind_from, after_wait_s, dest_radius, wait_started_t: None }
+    }
+}
+
 pub struct RouteAutopilot {
     follower: RouteFollower,
     heading_controller: HeadingController,
@@ -82,6 +114,10 @@ pub struct RouteAutopilot {
     /// Simplified coastline obstacles for reactive land avoidance. Empty
     /// → no avoidance (open-water-only runs, all unit tests).
     obstacles: Vec<Obstacle>,
+    /// When present, re-route from the current position if a tidal gate is
+    /// held past its window instead of waiting it out. `None` → gates
+    /// behave as before (wait for the fair stream).
+    replan: Option<ReplanContext>,
 }
 
 impl RouteAutopilot {
@@ -105,6 +141,62 @@ impl RouteAutopilot {
             crab_enabled,
             forecast,
             obstacles,
+            replan: None,
+        }
+    }
+
+    /// Enable mid-mission re-routing on a held tidal gate (off by default).
+    pub fn enable_replanning(&mut self, ctx: ReplanContext) {
+        self.replan = Some(ctx);
+    }
+
+    /// If the follower is parked at a tidal gate and has been for longer
+    /// than `after_wait_s`, re-run the planner from the current position
+    /// and time and swap in the result. Returns `true` if the route was
+    /// replaced (the caller should re-query the follower for this tick's
+    /// heading). No-op when replanning is disabled or the boat isn't
+    /// waiting.
+    fn maybe_replan(&mut self, t: f64, pos: (f64, f64)) -> bool {
+        let Some(ctx) = self.replan.as_mut() else { return false };
+        if !self.follower.waiting_at_gate() {
+            ctx.wait_started_t = None;
+            return false;
+        }
+        let started = *ctx.wait_started_t.get_or_insert(t);
+        if t - started < ctx.after_wait_s {
+            return false;
+        }
+        // Plan from here to the route's destination, starting at the
+        // current wall-clock time so the tide forecast phase lines up.
+        let dest = self.follower.destination();
+        let pc = PlanConfig {
+            start: pos,
+            dest,
+            wind_from: ctx.wind_from,
+            start_time: t,
+            dt: 600.0,
+            heading_step_deg: 5.0,
+            cross_track_bucket_m: 500.0,
+            max_steps: 800,
+            dest_radius: ctx.dest_radius,
+        };
+        match plan(&pc, &ctx.polar, &self.forecast, ctx.chart.as_ref()) {
+            Some(result) => {
+                let pts = simplify(&result.path, 250.0);
+                if pts.len() >= 2 {
+                    self.follower.replace_remaining(&pts);
+                }
+                // Whether or not the path was usable, stand down the timer
+                // so we don't hammer the planner every tick.
+                ctx.wait_started_t = None;
+                pts.len() >= 2
+            }
+            None => {
+                // Couldn't reach: keep waiting, but don't retry until the
+                // window has elapsed again.
+                ctx.wait_started_t = Some(t);
+                false
+            }
         }
     }
 
@@ -193,11 +285,6 @@ fn crab_heading(desired_cog: f64, current: (f64, f64), water_speed: f64) -> f64 
     desired_cog + (-c_perp / water_speed).clamp(-lim, lim).asin()
 }
 
-/// Pick the sail side from the apparent wind angle, holding the previous
-/// side through the ambiguous bands around dead-ahead (tack) and
-/// dead-astern (gybe). Away from those bands the side follows the wind:
-/// positive apparent angle → +1, negative → −1 (matching the old
-/// `sign(apparent_angle)` convention).
 /// Proper segment-segment intersection test (excludes collinear touching).
 fn segments_intersect(
     ax: f64, ay: f64, bx: f64, by: f64,
@@ -216,6 +303,11 @@ fn cross3(p1x: f64, p1y: f64, p2x: f64, p2y: f64, p3x: f64, p3y: f64) -> f64 {
     (p2x - p1x) * (p3y - p1y) - (p2y - p1y) * (p3x - p1x)
 }
 
+/// Pick the sail side from the apparent wind angle, holding the previous
+/// side through the ambiguous bands around dead-ahead (tack) and
+/// dead-astern (gybe). Away from those bands the side follows the wind:
+/// positive apparent angle → +1, negative → −1 (matching the old
+/// `sign(apparent_angle)` convention).
 fn next_sail_side(apparent_angle: f64, prev: f64) -> f64 {
     let a = apparent_angle.abs();
     if a <= SAIL_SIDE_DEADBAND || a >= PI - SAIL_SIDE_DEADBAND {
@@ -240,7 +332,7 @@ impl Autopilot for RouteAutopilot {
             direction: obs.true_wind.direction.to_degrees(),
         };
 
-        let desired = match self
+        let mut desired = match self
             .follower
             .update(obs.t, obs.pos_x, obs.pos_y, tw, obs.current, &self.forecast)
         {
@@ -253,6 +345,18 @@ impl Autopilot for RouteAutopilot {
                 };
             }
         };
+
+        // If we're parked at a tidal gate past its window, re-route from
+        // here rather than wait it out (opt-in). A successful replan swaps
+        // the follower's route, so re-query it for this tick's heading.
+        if self.maybe_replan(obs.t, (obs.pos_x, obs.pos_y)) {
+            if let Some(h) =
+                self.follower
+                    .update(obs.t, obs.pos_x, obs.pos_y, tw, obs.current, &self.forecast)
+            {
+                desired = h;
+            }
+        }
 
         // Reactive land avoidance: deflect the desired course over ground
         // away from any coastline within the lookahead before it's handed
@@ -394,6 +498,57 @@ mod tests {
         // Too slow for crab → returns the desired course unchanged.
         let h4 = crab_heading(0.0, (0.0, 0.5), 0.3);
         assert!(h4.abs() < 1e-9, "got {}", h4);
+    }
+
+    #[test]
+    fn held_gate_triggers_replan_and_swaps_route() {
+        use crate::planner::Polar;
+        // North-bound route whose start is a tidal gate; destination is
+        // far enough that the planner emits a real (tacking) path.
+        let mut route = straight_north_route();
+        route.waypoints = vec![
+            Waypoint { x: 0.0, y: 0.0, gate: true, soft: false },
+            Waypoint { x: 0.0, y: 2000.0, gate: false, soft: false },
+        ];
+        let mut ap = RouteAutopilot::new(
+            &cfg(),
+            route,
+            0.3,
+            2.0,
+            false,
+            TideForecast::None,
+            vec![],
+        );
+        // Flat polar: can't point below 45° but sails 1 m/s otherwise.
+        let polar = Polar::new(vec![(45.0, 1.0), (90.0, 1.0), (135.0, 1.0), (180.0, 1.0)]);
+        // Wind from the north (+y) → destination is dead upwind, forcing a
+        // tacked plan. Re-route the instant the gate is found held. The
+        // 400 m capture radius matches the planner's 600 m step granularity
+        // (a tighter radius the coarse front would overshoot).
+        ap.enable_replanning(ReplanContext::new(polar, None, PI / 2.0, 0.0, 400.0));
+
+        // Foul (southward) tide at the gate → the follower would normally
+        // park here; replanning should instead swap in a fresh route.
+        let o = Observation {
+            t: 10.0,
+            pos_x: 0.0,
+            pos_y: 0.0,
+            heading: PI / 2.0,
+            yaw_rate: 0.0,
+            roll: 0.0,
+            vel_x_body: 0.5,
+            vel_y_body: 0.0,
+            true_wind: WindReading { direction: -PI / 2.0, speed: 5.0 },
+            current: (0.0, -0.6),
+        };
+        let cmd = ap.step(&o);
+        let wps = &ap.route().waypoints;
+        assert!(!wps[0].gate, "the gate should be gone after re-routing");
+        assert!(wps.len() >= 3, "tacked replan emits intermediate waypoints, got {}", wps.len());
+        let last = wps.last().unwrap();
+        assert_eq!((last.x, last.y), (0.0, 2000.0), "destination preserved");
+        assert!(!cmd.mission_complete);
+        assert!(cmd.rudder_angle.is_finite());
     }
 
     #[test]
