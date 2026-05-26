@@ -357,7 +357,20 @@ pub fn scenario_plan(
     // Hold only when the stream is actively foul; open as soon as it's
     // non-foul, so cross-tide legs (along-current ~0) don't lock up.
     const GATE_OPEN_ALONG: f64 = 0.0;
-    const GATE_FOUL_MARGIN: f64 = 0.05;
+    // Only gate a leg when the foul stream is strong enough to stop or
+    // reverse the boat. As long as the foul is weaker than the boat's own
+    // speed it still makes net headway, so sailing through beats holding
+    // (which parks it for the whole foul phase and exposes it to any
+    // cross-set) — confirmed by ungated-vs-gated A/B runs. Scale the
+    // threshold off the planner's mean speed (length / ETA) so it tracks
+    // the boat and conditions rather than a fixed number; gate just below
+    // the speed where along-track progress would collapse.
+    let nominal_speed = if result.eta_s > 0.0 {
+        result.length_m / result.eta_s
+    } else {
+        0.6
+    };
+    let gate_foul_margin = (0.9 * nominal_speed).clamp(0.25, 1.2);
     if tidal_gates {
         let (dp, dt) = densify_legs(&pts, &times, GATE_MAX_LEG_M);
         pts = dp;
@@ -365,7 +378,7 @@ pub fn scenario_plan(
     }
 
     let gates = if tidal_gates {
-        crate::planner::tidal_gate_flags(&pts, &times, &forecast, GATE_FOUL_MARGIN, GATE_MIN_LEG_M)
+        crate::planner::tidal_gate_flags(&pts, &times, &forecast, gate_foul_margin, GATE_MIN_LEG_M)
     } else {
         vec![false; pts.len()]
     };
@@ -393,6 +406,14 @@ pub fn scenario_plan(
         pts.len(),
         n_gates,
     );
+    if tidal_gates && n_gates == 0 {
+        println!(
+            "  (no gates: along-leg foul never exceeds {:.2} m/s, the threshold for this \
+             boat's ~{:.2} m/s speed — the tide is too weak or too cross-track to be worth \
+             holding for; sailing straight through is faster)",
+            gate_foul_margin, nominal_speed,
+        );
+    }
     Ok(())
 }
 
