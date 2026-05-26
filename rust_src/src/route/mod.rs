@@ -121,6 +121,13 @@ impl Route {
     }
 }
 
+/// Fraction of the current leg length used as the effective XTE lookahead
+/// (clamped to `[route.xte_lookahead, XTE_LOOKAHEAD_CAP]`).
+const XTE_LEG_FRACTION: f64 = 0.10;
+/// Upper bound (m) on the effective XTE lookahead, so it never grows so
+/// large the boat ignores cross-track error entirely.
+const XTE_LOOKAHEAD_CAP: f64 = 3000.0;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tack {
     None,
@@ -380,7 +387,16 @@ impl RouteFollower {
         let leg_len = dx.hypot(dy);
         let chi_path = dy.atan2(dx);
         let xte = ((pos_x - prev.x) * (-dy) + (pos_y - prev.y) * dx) / leg_len;
-        let chi_los = wrap_pi(chi_path + (-xte).atan2(self.route.xte_lookahead));
+        // Scale the lookahead with leg length: on a long open-water leg a
+        // tight lookahead turns any tidal offset into a near-90° "claw back
+        // to the line" command, which pinches a close-hauled boat and stalls
+        // it; a loose lookahead lets it foot for speed. On a short approach
+        // leg the tight value is kept so the boat tracks the line and clears
+        // nearby land. `route.xte_lookahead` is the floor (so a route only
+        // ever gets looser, never tighter, than configured).
+        let eff_lookahead = (XTE_LEG_FRACTION * leg_len)
+            .clamp(self.route.xte_lookahead, self.route.xte_lookahead.max(XTE_LOOKAHEAD_CAP));
+        let chi_los = wrap_pi(chi_path + (-xte).atan2(eff_lookahead));
 
         // ----- No-go decision based on bearing-to-target -----
         let bearing_to_target = (next.y - pos_y).atan2(next.x - pos_x);
@@ -512,6 +528,33 @@ mod tests {
             fly_by_radius: 0.0,
             loop_route: false,
         }
+    }
+
+    #[test]
+    fn xte_lookahead_loosens_on_long_legs() {
+        // Crosswind from the north so the +x legs are steered directly
+        // (LOS+XTE), not tacked. Same +50 m cross-track offset on both.
+        let wind = wind_from_deg(5.0, 90.0);
+
+        // Long leg (10 km): eff lookahead = 0.1·len = 1000 m → gentle
+        // correction so the boat foots instead of clawing to the line.
+        let mut rf_long = RouteFollower::new(straight_route("long", 0.0, 0.0, 10000.0, 0.0));
+        let h_long = rf_long
+            .update(0.0, 10.0, 50.0, wind, (0.0, 0.0), &TideForecast::None)
+            .unwrap();
+
+        // Short leg (100 m): 0.1·len = 10 m is below the route's 15 m
+        // floor → tight lookahead, sharp correction back to the line.
+        let mut rf_short = RouteFollower::new(straight_route("short", 0.0, 0.0, 100.0, 0.0));
+        let h_short = rf_short
+            .update(0.0, 10.0, 50.0, wind, (0.0, 0.0), &TideForecast::None)
+            .unwrap();
+
+        // Both legs run +x (chi_path = 0), so the heading *is* the
+        // correction angle. The long leg corrects far more gently.
+        assert!(h_long.abs() < h_short.abs());
+        assert!((h_long - (-50f64).atan2(1000.0)).abs() < 1e-6);
+        assert!((h_short - (-50f64).atan2(15.0)).abs() < 1e-6);
     }
 
     #[test]
