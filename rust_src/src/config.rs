@@ -219,7 +219,11 @@ mod tests {
 
     #[test]
     fn invariants_match_python() {
-        let cfg = Config::load(&yaml_path()).expect("config should load");
+        let mut cfg = Config::load(&yaml_path()).expect("config should load");
+        // Python reference fixtures were generated with the original
+        // c_wr = 1.0; the shipped config is now calibrated (0.06), so pin
+        // c_wr here — this checks port fidelity, not the production tuning.
+        cfg.boat.wave_resistance_weight = 1.0;
         let inv = Invariants::from_config(&cfg);
         // Values reproduced by running simulation.py module-level
         // expressions with the shipped YAML.

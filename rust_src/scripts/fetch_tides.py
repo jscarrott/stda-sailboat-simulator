@@ -12,8 +12,8 @@ model is spatially uniform, so a point/area time series is the right
 shape; graduate to a full grid later if you want the races resolved.
 
 REQUIREMENTS (run on your own machine with your CMEMS account):
-    pip install copernicusmarine xarray netCDF4
-    copernicusmarine login        # once, stores credentials
+    uv sync --group tides                       # installs copernicusmarine, xarray, netcdf4
+    uv run --group tides copernicusmarine login # once, stores credentials
 
 VERIFY before trusting the output:
   - DATASET_ID below. Product/dataset ids change between CMEMS releases;
@@ -25,7 +25,8 @@ VERIFY before trusting the output:
     products are not).
 
 Usage (from rust_src/):
-    python scripts/fetch_tides.py --start 2026-05-25 --days 3
+    uv run --group tides python scripts/fetch_tides.py --start 2026-05-25 --days 3
+    # or simply: just fetch-tides 2026-05-25 3
 """
 import argparse
 import json
@@ -41,8 +42,12 @@ LON_MIN, LON_MAX = -4.55, -4.25
 # Tangent-plane origin shared with the coastline cache (centre of Lundy).
 ORIGIN = {"lat": 51.1735, "lon": -4.6680}
 
-# CMEMS NW-Shelf hourly physics (uo, vo). VERIFY — see module docstring.
-DATASET_ID = "cmems_mod_nws_phy_anfc_0.027deg-2D_PT1H-i"
+# CMEMS NW-Shelf hourly *surface currents* (uo, vo), 1.5 km grid. This is a
+# 2D (surface-only) dataset — no depth axis — so we don't pass depth bounds.
+# VERIFY — see module docstring; ids change between CMEMS releases. Find the
+# current one with:
+#   copernicusmarine describe -p NWSHELF_ANALYSISFORECAST_PHY_004_013 -r datasets
+DATASET_ID = "cmems_mod_nws_phy-cur_anfc_1.5km-2D_PT1H-i"
 VAR_U, VAR_V = "uo", "vo"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -86,10 +91,11 @@ def main():
         maximum_latitude=LAT_MAX,
         start_datetime=start.isoformat(),
         end_datetime=end.isoformat(),
-        minimum_depth=0.0,
-        maximum_depth=1.0,
-        output_filename=tmp_nc,
-        force_download=True,
+        # No depth bounds: the -2D dataset is surface-only (no depth axis).
+        # copernicusmarine 2.x: output_filename is a name under output_directory.
+        output_directory=HERE,
+        output_filename=os.path.basename(tmp_nc),
+        overwrite=True,
     )
 
     ds = xr.open_dataset(tmp_nc)

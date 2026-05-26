@@ -1,21 +1,28 @@
-[tool.poetry]
+[project]
 name = "sailboat-sim"
 version = "0.1.0"
-description = ""
-authors = ["Your Name <you@example.com>"]
-readme = "README.md"
-packages = [{include = "sailboat_sim"}]
+description = "6-DOF sailboat physics simulator — Python reference implementation"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26.2",
+    "scipy>=1.11.4",
+    "pyyaml>=6.0.1",
+    "matplotlib>=3.8.2",
+    "polars>=0.19.19",
+]
 
+[dependency-groups]
+# CMEMS tidal-current fetcher (rust_src/scripts/fetch_tides.py). Heavy, and
+# needs a Copernicus Marine account — not installed by default. Pull it in
+# on demand with `uv sync --group tides` (or `uv run --group tides ...`).
+tides = [
+    "copernicusmarine",
+    "xarray",
+    "netcdf4",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-numpy = "^1.26.2"
-scipy = "^1.11.4"
-pyyaml = "^6.0.1"
-matplotlib = "^3.8.2"
-polars = "^0.19.19"
-
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[tool.uv]
+# The sailboat_sim/ reference is run as loose scripts
+# (`cd sailboat_sim && uv run python run.py`), not imported as an installed
+# package, so uv shouldn't try to build/install it.
+package = false

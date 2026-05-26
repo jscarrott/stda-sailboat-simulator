@@ -242,7 +242,11 @@ mod tests {
     /// integration scaling errors) within 1% relative.
     #[test]
     fn derivatives_within_one_percent_of_python() {
-        let cfg = Config::load(&manifest_dir().join("sim_params_config.yaml")).unwrap();
+        let mut cfg = Config::load(&manifest_dir().join("sim_params_config.yaml")).unwrap();
+        // Fixtures were dumped from Python with the original c_wr = 1.0; the
+        // shipped config is now calibrated (0.06). Pin c_wr for the parity
+        // check — this verifies the port, not the production speed tuning.
+        cfg.boat.wave_resistance_weight = 1.0;
         let inv = Invariants::from_config(&cfg);
         let path = manifest_dir().join("tests/fixtures/derivatives.json");
         let raw = std::fs::read_to_string(&path).expect("run scripts/dump_fixtures.py first");

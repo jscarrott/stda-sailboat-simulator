@@ -151,6 +151,13 @@ struct Cli {
     /// a tide (--tide-* or --tide-data); off by default.
     #[arg(long)]
     plan_tidal_gates: bool,
+
+    /// `--scenario fleet`: comma-separated config paths to run on the same
+    /// route, each as its own track overlaid on one PNG (labelled by boat
+    /// length, with finish time in days). Generate sizes with
+    /// scripts/scale_hull.py.
+    #[arg(long, value_delimiter = ',')]
+    fleet_configs: Vec<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -236,6 +243,16 @@ fn main() -> Result<()> {
                 };
                 println!("  {:>7.0}  {:>9.2}  {:>8.2}  {}", twa, sp, sp * 1.94384, pos);
             }
+            let out = cli.out.unwrap_or_else(|| {
+                let stem = cli
+                    .config
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("config");
+                PathBuf::from(format!("figs/polar_{}_{:.0}ms.png", stem, wind_speed))
+            });
+            plot::plot_polar(&polar, wind_speed, &out)?;
+            println!("wrote {}", out.display());
         }
         "plan" => {
             let route_path = cli
@@ -275,9 +292,102 @@ fn main() -> Result<()> {
                 cli.plan_tidal_gates,
             )?;
         }
-        other => bail!("unknown scenario {other:?}; supported: route, polar, plan"),
+        "fleet" => {
+            if cli.fleet_configs.is_empty() {
+                bail!("--fleet-configs <a.yaml,b.yaml,...> is required for --scenario fleet");
+            }
+            let route_path = cli
+                .route
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("--route <path> is required for --scenario fleet"))?;
+            let wind_override = match (cli.wind_deg, cli.wind_speed) {
+                (Some(d), Some(s)) => Some(WindOverride { direction_deg: d, speed: s }),
+                (None, None) => None,
+                _ => bail!("--wind-deg and --wind-speed must be set together"),
+            };
+            let variance = WindVariance {
+                speed_sigma: cli.wind_speed_sigma,
+                direction_sigma_rad: cli.wind_dir_sigma_deg.to_radians(),
+                correlation_time_s: cli.wind_time_constant,
+                seed: cli.wind_seed,
+            };
+            let solver = match cli.solver.as_str() {
+                "dopri5" => Solver::Dopri5,
+                "rk4" => Solver::Rk4,
+                other => bail!("unknown --solver {other:?}; supported: dopri5, rk4"),
+            };
+            let tide = TidalParams {
+                peak_speed: cli.tide_peak,
+                axis_rad: (90.0 - cli.tide_flood_deg).to_radians(),
+                period_s: cli.tide_period_h * 3600.0,
+                phase_rad: cli.tide_phase_deg.to_radians(),
+            };
+
+            let mut tracks: Vec<(String, scenario::SimResult)> = Vec::new();
+            let mut shared: Option<(route::Route, Option<chart::Chart>)> = None;
+            println!("fleet on {} ({} boats):", route_path.display(), cli.fleet_configs.len());
+            for cfg_path in &cli.fleet_configs {
+                let cfg = Config::load(cfg_path)?;
+                let length = cfg.boat.length;
+                // Name the track by the config file stem (e.g. "aclass", "2.5m"),
+                // dropping a "sim_params_" prefix, so named boats are distinct.
+                let stem = cfg_path.file_stem().and_then(|s| s.to_str()).unwrap_or("boat");
+                let name = stem.strip_prefix("sim_params_").unwrap_or(stem);
+                let run = scenario_route(
+                    &cfg,
+                    route_path,
+                    cli.chart.as_deref(),
+                    cli.max_run_time_s,
+                    wind_override,
+                    Some(variance),
+                    Some(tide),
+                    cli.tide_data.as_deref(),
+                    cli.crab,
+                    solver,
+                    cli.replan_on_gate.then_some(cli.replan_after_wait_s),
+                    cli.polar_derate,
+                )?;
+                let finish_s = finish_time_s(&run.route, &run.result);
+                let label = match finish_s {
+                    Some(s) => {
+                        println!("  {name} ({length:.2} m): finished in {:.2} days ({:.0} s)", s / 86400.0, s);
+                        format!("{name} — {:.2} d", s / 86400.0)
+                    }
+                    None => {
+                        println!(
+                            "  {name} ({length:.2} m): did not finish within {:.0} s ({:.1} days)",
+                            cli.max_run_time_s, cli.max_run_time_s / 86400.0
+                        );
+                        format!("{name} — DNF")
+                    }
+                };
+                if shared.is_none() {
+                    shared = Some((run.route.clone(), run.chart.clone()));
+                }
+                tracks.push((label, run.result));
+            }
+            let (route, chart) = shared.expect("at least one fleet config");
+            let out = cli.out.unwrap_or_else(|| PathBuf::from("figs/fleet.png"));
+            let refs: Vec<(String, &scenario::SimResult)> =
+                tracks.iter().map(|(l, r)| (l.clone(), r)).collect();
+            plot::plot_fleet(&refs, &route, chart.as_ref(), &out)?;
+            println!("wrote {}", out.display());
+        }
+        other => bail!("unknown scenario {other:?}; supported: route, polar, plan, fleet"),
     }
     Ok(())
+}
+
+/// Time (s) the boat captures the final waypoint, or `None` if it never
+/// reaches the destination within the run. The simulator breaks the loop on
+/// mission-complete, so when finished the last track point sits inside the
+/// destination's acceptance radius and the final timestamp is the finish time.
+fn finish_time_s(route: &route::Route, result: &scenario::SimResult) -> Option<f64> {
+    use state::{POS_X, POS_Y};
+    let dest = route.waypoints.last()?;
+    let last = result.x.last()?;
+    let d = ((last[POS_X] - dest.x).powi(2) + (last[POS_Y] - dest.y).powi(2)).sqrt();
+    (d <= route.acceptance_radius).then(|| result.t.last().copied()).flatten()
 }
 
 /// Post-run report: how far along the route the boat actually got, how

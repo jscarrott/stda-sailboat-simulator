@@ -25,6 +25,15 @@ boat: {
     lateral_area:     2.5, # [m^2]
     waterline_area:   1.6, # [m^2]
 
+    # c_wr (paper eq.8) wave-resistance weight. Was the hardcoded default
+    # 1.0, which left this 4 m hull doing only ~0.9 m/s — slower than the
+    # 1 m IOM and unable to beat the ~1 m/s Bristol Channel tide. 0.06
+    # matches the geometrically-scaled IOM (same hull family, the only
+    # curve-fit reference we have) and gives a realistic ~1.78 m/s reaching
+    # / ~1.34 m/s upwind (≈70% of the 2.5 m/s hull speed). Still NOT fitted
+    # to measured data — the paper flags c_wr + damping for real-data ID.
+    wave_resistance_weight: 0.06,
+
     # cog: center of gravity
     distance_cog_sail_pressure_point:  0.43, # [m]
     distance_cog_keel_pressure_point:  0.24, # [m]
