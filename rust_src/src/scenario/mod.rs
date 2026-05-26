@@ -73,6 +73,7 @@ pub fn scenario_route(
     crab: bool,
     solver: Solver,
     replan_after_wait_s: Option<f64>,
+    polar_derate: f64,
 ) -> Result<RouteRun> {
     let route = Route::load(route_path)?;
     let chart = chart_path.map(Chart::load).transpose()?;
@@ -139,7 +140,7 @@ pub fn scenario_route(
         let wind_speed = env.true_wind.strength;
         let wind_from =
             (env.true_wind.y.atan2(env.true_wind.x) + PI).rem_euclid(2.0 * PI) - PI;
-        let polar = Polar::new(scenario_polar(cfg, wind_speed, solver)?);
+        let polar = Polar::new(scenario_polar(cfg, wind_speed, solver)?).derate(polar_derate);
         let dest_radius = route.acceptance_radius.max(400.0);
         autopilot.enable_replanning(ReplanContext::new(
             polar,
@@ -305,6 +306,7 @@ pub fn scenario_plan(
     tide_data: Option<&Path>,
     solver: Solver,
     out_route: &Path,
+    polar_derate: f64,
 ) -> Result<()> {
     let route = Route::load(route_path)?;
     let chart = chart_path.map(Chart::load).transpose()?;
@@ -314,8 +316,8 @@ pub fn scenario_plan(
     let tw = wind.to_true_wind();
     let wind_from = (tw.y.atan2(tw.x) + PI).rem_euclid(2.0 * PI) - PI;
 
-    // Sample the model's polar at the planning wind speed.
-    let polar = Polar::new(scenario_polar(cfg, wind.speed, solver)?);
+    // Sample the model's polar at the planning wind speed, derated for margin.
+    let polar = Polar::new(scenario_polar(cfg, wind.speed, solver)?).derate(polar_derate);
     let forecast = build_forecast(tide, tide_data)?;
 
     let start = (route.waypoints[0].x, route.waypoints[0].y);

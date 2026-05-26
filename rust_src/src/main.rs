@@ -136,6 +136,14 @@ struct Cli {
     /// with --replan-on-gate). Default ~ one semidiurnal half-cycle.
     #[arg(long, default_value_t = 3600.0)]
     replan_after_wait_s: f64,
+
+    /// Planning-polar derate factor (`--scenario plan` and the gate
+    /// re-router). The measured steady-state polar overstates what the
+    /// boat holds through tacks/gusts; scaling it < 1 makes the planner's
+    /// ETA realistic and leans it less on outrunning a foul tide. 1.0 =
+    /// no change; ~0.8 is a reasonable starting margin.
+    #[arg(long, default_value_t = 1.0)]
+    polar_derate: f64,
 }
 
 fn main() -> Result<()> {
@@ -184,6 +192,7 @@ fn main() -> Result<()> {
                 cli.crab,
                 solver,
                 cli.replan_on_gate.then_some(cli.replan_after_wait_s),
+                cli.polar_derate,
             )?;
             let out = cli.out.unwrap_or_else(|| {
                 PathBuf::from(format!("figs/route_{}.png", run.route.name))
@@ -255,6 +264,7 @@ fn main() -> Result<()> {
                 cli.tide_data.as_deref(),
                 solver,
                 &out,
+                cli.polar_derate,
             )?;
         }
         other => bail!("unknown scenario {other:?}; supported: route, polar, plan"),
