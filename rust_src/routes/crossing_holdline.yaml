@@ -1,0 +1,12 @@
+name: crossing_holdline
+acceptance_radius: 150
+close_hauled_angle_deg: 45
+xte_lookahead: 100
+min_tack_duration_s: 30
+fly_by_radius: 400.0
+# A/B baseline: hold the rhumb line, switch tacks freely (short tacks).
+wind: { direction_deg: 45, speed: 6 }
+waypoints:
+  - { x: 38900.0, y: 4100.0 }
+  - { x: 3000.0, y: 3800.0 }
+loop: false

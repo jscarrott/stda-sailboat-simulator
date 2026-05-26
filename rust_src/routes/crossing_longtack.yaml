@@ -1,0 +1,13 @@
+name: crossing_longtack
+acceptance_radius: 150
+close_hauled_angle_deg: 45
+xte_lookahead: 2500
+min_tack_duration_s: 1800
+fly_by_radius: 400.0
+# A/B variant: foot for speed (loose XTE) and commit to long tacks
+# (30 min minimum) instead of clawing back to the rhumb line.
+wind: { direction_deg: 45, speed: 6 }
+waypoints:
+  - { x: 38900.0, y: 4100.0 }
+  - { x: 3000.0, y: 3800.0 }
+loop: false
