@@ -62,6 +62,21 @@ impl Polar {
     fn max_speed(&self) -> f64 {
         self.speed.iter().cloned().fold(0.0, f64::max)
     }
+
+    /// Scale every speed by `factor`. A value below 1 derates the polar
+    /// for planning margin: the measured steady-state polar is optimistic
+    /// versus the speed the boat actually holds through tacks, gusts and
+    /// accelerations, so an un-derated polar makes the planner's ETA (and any
+    /// gate-arrival timing built on it) run early. Derating also raises the
+    /// tide-to-boatspeed ratio the planner sees — correctly, since a slower
+    /// boat is more set by the current — so it leans less on outrunning a
+    /// foul stream. `factor = 1.0` is a no-op.
+    pub fn derate(mut self, factor: f64) -> Self {
+        for s in &mut self.speed {
+            *s *= factor;
+        }
+        self
+    }
 }
 
 /// Planner configuration.
@@ -315,6 +330,18 @@ mod tests {
     fn flat_polar() -> Polar {
         // 1 m/s everywhere from 45°..180°, nothing below 45° (no-go).
         Polar::new(vec![(45.0, 1.0), (90.0, 1.0), (135.0, 1.0), (180.0, 1.0)])
+    }
+
+    #[test]
+    fn derate_scales_all_speeds_and_preserves_no_go() {
+        let p = flat_polar().derate(0.8);
+        assert!((p.speed_at(90.0) - 0.8).abs() < 1e-9);
+        assert!((p.speed_at(135.0) - 0.8).abs() < 1e-9);
+        // Below the no-go angle stays zero (scaling 0 is still 0).
+        assert_eq!(p.speed_at(30.0), 0.0);
+        // A factor of 1.0 is a no-op.
+        let q = flat_polar().derate(1.0);
+        assert!((q.speed_at(90.0) - 1.0).abs() < 1e-9);
     }
 
     #[test]
