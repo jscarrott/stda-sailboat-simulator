@@ -108,6 +108,10 @@ struct Node {
 pub struct PlanResult {
     /// Path waypoints from start to destination (inclusive).
     pub path: Vec<(f64, f64)>,
+    /// Planner arrival time (s, relative to `start_time`) at each `path`
+    /// point — the continuous-sail schedule, used to decide which legs
+    /// would be sailed against a foul tide and so want a gate.
+    pub times: Vec<f64>,
     /// Estimated time to sail it (s).
     pub eta_s: f64,
     /// Path length (m).
@@ -185,22 +189,25 @@ pub fn plan(
 
 fn backtrack(arena: &[Node], end: usize, dest: (f64, f64)) -> PlanResult {
     let mut idx = end;
-    let mut pts: Vec<(f64, f64)> = vec![dest];
     let eta = arena[end].t;
+    let mut pts: Vec<(f64, f64)> = vec![dest];
+    let mut times: Vec<f64> = vec![eta]; // dest reached ~at the final node's time
     loop {
         let n = &arena[idx];
         pts.push((n.x, n.y));
+        times.push(n.t);
         if n.parent == usize::MAX {
             break;
         }
         idx = n.parent;
     }
     pts.reverse();
+    times.reverse();
     let mut length = 0.0;
     for w in pts.windows(2) {
         length += dist(w[0], w[1]);
     }
-    PlanResult { path: pts, eta_s: eta, length_m: length }
+    PlanResult { path: pts, times, eta_s: eta, length_m: length }
 }
 
 // --- geometry helpers ---
@@ -287,29 +294,74 @@ fn cross3(p1x: f64, p1y: f64, p2x: f64, p2y: f64, p3x: f64, p3y: f64) -> f64 {
 /// own tacking between waypoints; RDP keeps each emitted leg a clean
 /// single tack.
 pub fn simplify(path: &[(f64, f64)], epsilon: f64) -> Vec<(f64, f64)> {
-    if path.len() < 3 {
-        return path.to_vec();
+    simplify_idx(path, epsilon).into_iter().map(|i| path[i]).collect()
+}
+
+/// RDP simplification returning the *indices* of the kept points (in
+/// ascending order). Lets a caller carry per-point side data (e.g. the
+/// planner's arrival times) through the simplification.
+pub fn simplify_idx(path: &[(f64, f64)], epsilon: f64) -> Vec<usize> {
+    let n = path.len();
+    if n < 3 {
+        return (0..n).collect();
     }
-    let s = path[0];
-    let e = path[path.len() - 1];
-    let mut idx = 0;
+    let mut keep = vec![false; n];
+    keep[0] = true;
+    keep[n - 1] = true;
+    rdp(path, 0, n - 1, epsilon, &mut keep);
+    (0..n).filter(|&i| keep[i]).collect()
+}
+
+fn rdp(path: &[(f64, f64)], lo: usize, hi: usize, epsilon: f64, keep: &mut [bool]) {
+    if hi <= lo + 1 {
+        return;
+    }
+    let (s, e) = (path[lo], path[hi]);
+    let mut idx = lo;
     let mut dmax = 0.0;
-    for (i, &p) in path.iter().enumerate().take(path.len() - 1).skip(1) {
-        let d = point_seg_dist(p, s, e);
+    for i in (lo + 1)..hi {
+        let d = point_seg_dist(path[i], s, e);
         if d > dmax {
             dmax = d;
             idx = i;
         }
     }
     if dmax > epsilon {
-        let mut left = simplify(&path[..=idx], epsilon);
-        let right = simplify(&path[idx..], epsilon);
-        left.pop(); // shared midpoint
-        left.extend(right);
-        left
-    } else {
-        vec![s, e]
+        keep[idx] = true;
+        rdp(path, lo, idx, epsilon, keep);
+        rdp(path, idx, hi, epsilon, keep);
     }
+}
+
+/// Decide which planned waypoints should be tidal gates. Waypoint `i` is
+/// gated when the leg `i -> i+1` would be sailed against a foul (or merely
+/// insufficient) stream at its planned arrival time — i.e. the along-leg
+/// current is below `threshold` (m/s) — so the follower holds there until
+/// the tide turns fair instead of committing and being set off. Legs
+/// shorter than `min_leg_m` are never gated (a hold isn't worth it), and
+/// the final waypoint (no next leg) is never a gate. Returns one flag per
+/// point in `pts`.
+pub fn tidal_gate_flags(
+    pts: &[(f64, f64)],
+    times: &[f64],
+    forecast: &TideForecast,
+    threshold: f64,
+    min_leg_m: f64,
+) -> Vec<bool> {
+    let mut gates = vec![false; pts.len()];
+    for i in 0..pts.len().saturating_sub(1) {
+        let (dx, dy) = (pts[i + 1].0 - pts[i].0, pts[i + 1].1 - pts[i].1);
+        let len = dx.hypot(dy);
+        if len < min_leg_m {
+            continue;
+        }
+        let (cx, cy) = forecast.at(times[i]).unwrap_or((0.0, 0.0));
+        let along = (cx * dx + cy * dy) / len;
+        if along < threshold {
+            gates[i] = true;
+        }
+    }
+    gates
 }
 
 /// Perpendicular distance from point `p` to the segment `a`-`b`.
@@ -330,6 +382,28 @@ mod tests {
     fn flat_polar() -> Polar {
         // 1 m/s everywhere from 45°..180°, nothing below 45° (no-go).
         Polar::new(vec![(45.0, 1.0), (90.0, 1.0), (135.0, 1.0), (180.0, 1.0)])
+    }
+
+    #[test]
+    fn tidal_gate_flags_marks_foul_legs_only() {
+        // Three points, both legs run due +x. Reversing stream along +x
+        // (period 400 s, phase π/2): fair (+0.6) at t=0, foul (−0.6) at
+        // t=200. So leg0 (sailed at t=0) is fine, leg1 (at t=200) is foul.
+        let pts = vec![(0.0, 0.0), (100.0, 0.0), (200.0, 0.0)];
+        let times = vec![0.0, 200.0, 400.0];
+        let fc = TideForecast::Stream {
+            peak_speed: 0.6,
+            axis_rad: 0.0,
+            period_s: 400.0,
+            phase_rad: PI / 2.0,
+        };
+        let gates = tidal_gate_flags(&pts, &times, &fc, 0.05, 10.0);
+        assert_eq!(gates, vec![false, true, false]);
+
+        // Same foul leg but below the minimum gated length → not gated.
+        let short = vec![(0.0, 0.0), (5.0, 0.0), (10.0, 0.0)];
+        let g2 = tidal_gate_flags(&short, &times, &fc, 0.05, 50.0);
+        assert_eq!(g2, vec![false, false, false]);
     }
 
     #[test]

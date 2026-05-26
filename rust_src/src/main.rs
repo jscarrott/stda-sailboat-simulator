@@ -144,6 +144,13 @@ struct Cli {
     /// no change; ~0.8 is a reasonable starting margin.
     #[arg(long, default_value_t = 1.0)]
     polar_derate: f64,
+
+    /// `--scenario plan`: insert tidal gates where the planned path would
+    /// otherwise sail a leg against a foul stream, so the written route is
+    /// sailed with wait-for-fair discipline instead of being set off. Needs
+    /// a tide (--tide-* or --tide-data); off by default.
+    #[arg(long)]
+    plan_tidal_gates: bool,
 }
 
 fn main() -> Result<()> {
@@ -265,6 +272,7 @@ fn main() -> Result<()> {
                 solver,
                 &out,
                 cli.polar_derate,
+                cli.plan_tidal_gates,
             )?;
         }
         other => bail!("unknown scenario {other:?}; supported: route, polar, plan"),
