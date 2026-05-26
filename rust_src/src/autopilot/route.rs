@@ -372,9 +372,13 @@ impl Autopilot for RouteAutopilot {
         // directly — while tacking the heading is wind-relative and
         // already as high as the boat can point, so crabbing it would be
         // wrong; the cross-track term handles set over successive tacks.
+        // While station-keeping at a gate the follower already returns a
+        // water-frame heading (it stems the current itself), so crab would
+        // double-compensate — skip it.
         let has_current = obs.current.0 != 0.0 || obs.current.1 != 0.0;
         let heading_ref = if self.crab_enabled
             && has_current
+            && !self.follower.waiting_at_gate()
             && self.follower.current_tack() == Tack::None
         {
             // through-water speed = |ground velocity − current|
