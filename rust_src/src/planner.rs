@@ -334,20 +334,24 @@ fn rdp(path: &[(f64, f64)], lo: usize, hi: usize, epsilon: f64, keep: &mut [bool
 }
 
 /// Decide which planned waypoints should be tidal gates. Waypoint `i` is
-/// gated when the leg `i -> i+1` would be sailed against a foul (or merely
-/// insufficient) stream at its planned arrival time — i.e. the along-leg
-/// current is below `threshold` (m/s) — so the follower holds there until
-/// the tide turns fair instead of committing and being set off. Legs
-/// shorter than `min_leg_m` are never gated (a hold isn't worth it), and
-/// the final waypoint (no next leg) is never a gate. Returns one flag per
-/// point in `pts`.
+/// gated when the leg `i -> i+1` is *tide-exposed* — its along-leg current
+/// goes foul by more than `foul_margin` (m/s) at some point over a tidal
+/// cycle sampled from the planned arrival time — so the follower should
+/// hold there until the stream is fair before committing. We check the
+/// whole cycle, not just the planned arrival instant, because after
+/// waiting at earlier gates the boat reaches this leg at an unpredictable
+/// phase; gating any leg that can turn foul lets the follower time it.
+/// Cross-tide legs (along-current never strongly foul) and legs shorter
+/// than `min_leg_m` are left ungated, as is the final waypoint.
 pub fn tidal_gate_flags(
     pts: &[(f64, f64)],
     times: &[f64],
     forecast: &TideForecast,
-    threshold: f64,
+    foul_margin: f64,
     min_leg_m: f64,
 ) -> Vec<bool> {
+    const HORIZON_S: f64 = 12.42 * 3600.0; // one semidiurnal (M2) cycle
+    const SAMPLES: usize = 24;
     let mut gates = vec![false; pts.len()];
     for i in 0..pts.len().saturating_sub(1) {
         let (dx, dy) = (pts[i + 1].0 - pts[i].0, pts[i + 1].1 - pts[i].1);
@@ -355,9 +359,13 @@ pub fn tidal_gate_flags(
         if len < min_leg_m {
             continue;
         }
-        let (cx, cy) = forecast.at(times[i]).unwrap_or((0.0, 0.0));
-        let along = (cx * dx + cy * dy) / len;
-        if along < threshold {
+        let mut min_along = f64::INFINITY;
+        for k in 0..=SAMPLES {
+            let ts = times[i] + HORIZON_S * (k as f64) / (SAMPLES as f64);
+            let (cx, cy) = forecast.at(ts).unwrap_or((0.0, 0.0));
+            min_along = min_along.min((cx * dx + cy * dy) / len);
+        }
+        if min_along < -foul_margin {
             gates[i] = true;
         }
     }
@@ -385,25 +393,29 @@ mod tests {
     }
 
     #[test]
-    fn tidal_gate_flags_marks_foul_legs_only() {
-        // Three points, both legs run due +x. Reversing stream along +x
-        // (period 400 s, phase π/2): fair (+0.6) at t=0, foul (−0.6) at
-        // t=200. So leg0 (sailed at t=0) is fine, leg1 (at t=200) is foul.
-        let pts = vec![(0.0, 0.0), (100.0, 0.0), (200.0, 0.0)];
+    fn tidal_gate_flags_gates_tide_exposed_legs_only() {
+        // Leg0 runs +x along the tide axis (reversing stream goes foul on
+        // it each cycle → gate it); leg1 runs +y across the stream (along-
+        // current ~0 always → leave it open).
+        let pts = vec![(0.0, 0.0), (100.0, 0.0), (100.0, 100.0)];
         let times = vec![0.0, 200.0, 400.0];
         let fc = TideForecast::Stream {
             peak_speed: 0.6,
-            axis_rad: 0.0,
+            axis_rad: 0.0, // current oscillates along +x/-x
             period_s: 400.0,
-            phase_rad: PI / 2.0,
+            phase_rad: 0.0,
         };
         let gates = tidal_gate_flags(&pts, &times, &fc, 0.05, 10.0);
-        assert_eq!(gates, vec![false, true, false]);
+        assert_eq!(gates, vec![true, false, false]);
 
-        // Same foul leg but below the minimum gated length → not gated.
-        let short = vec![(0.0, 0.0), (5.0, 0.0), (10.0, 0.0)];
+        // The tide-exposed leg, but below the minimum gated length → skip.
+        let short = vec![(0.0, 0.0), (5.0, 0.0), (5.0, 100.0)];
         let g2 = tidal_gate_flags(&short, &times, &fc, 0.05, 50.0);
         assert_eq!(g2, vec![false, false, false]);
+
+        // No tide → no gates anywhere.
+        let g3 = tidal_gate_flags(&pts, &times, &TideForecast::None, 0.05, 10.0);
+        assert_eq!(g3, vec![false, false, false]);
     }
 
     #[test]

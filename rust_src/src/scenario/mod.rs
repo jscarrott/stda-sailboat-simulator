@@ -343,18 +343,29 @@ pub fn scenario_plan(
     // follower sails without adding its own tacking. Carry the planner's
     // arrival times through the simplification so we can decide gates.
     let idxs = simplify_idx(&result.path, 250.0);
-    let pts: Vec<(f64, f64)> = idxs.iter().map(|&i| result.path[i]).collect();
-    let times: Vec<f64> = idxs.iter().map(|&i| result.times[i]).collect();
+    let mut pts: Vec<(f64, f64)> = idxs.iter().map(|&i| result.path[i]).collect();
+    let mut times: Vec<f64> = idxs.iter().map(|&i| result.times[i]).collect();
 
-    // Mark gates where the planner would have sailed a leg against a foul
-    // stream: holding for fair tide there beats committing and being set
-    // off. `GATE_THRESHOLD` is the along-leg fair current (m/s) the gate
-    // opens on (shared with the follower so the open rule matches the
-    // gating rule); `GATE_MIN_LEG_M` avoids gating tiny fly-by hops.
-    const GATE_THRESHOLD: f64 = 0.1;
-    const GATE_MIN_LEG_M: f64 = 800.0;
+    // When gating, split any leg longer than a single fair-tide window can
+    // sail into sub-legs, with a gate between. A long leg committed in one
+    // go turns foul mid-way and sets the boat back; short sub-legs each fit
+    // a fair phase, so the boat rides through several gates while the tide
+    // is fair and only holds when it turns foul. `GATE_MAX_LEG_M` is sized
+    // so a sub-leg sails well inside a semidiurnal fair phase.
+    const GATE_MAX_LEG_M: f64 = 5000.0;
+    const GATE_MIN_LEG_M: f64 = 500.0;
+    // Hold only when the stream is actively foul; open as soon as it's
+    // non-foul, so cross-tide legs (along-current ~0) don't lock up.
+    const GATE_OPEN_ALONG: f64 = 0.0;
+    const GATE_FOUL_MARGIN: f64 = 0.05;
+    if tidal_gates {
+        let (dp, dt) = densify_legs(&pts, &times, GATE_MAX_LEG_M);
+        pts = dp;
+        times = dt;
+    }
+
     let gates = if tidal_gates {
-        crate::planner::tidal_gate_flags(&pts, &times, &forecast, GATE_THRESHOLD, GATE_MIN_LEG_M)
+        crate::planner::tidal_gate_flags(&pts, &times, &forecast, GATE_FOUL_MARGIN, GATE_MIN_LEG_M)
     } else {
         vec![false; pts.len()]
     };
@@ -362,16 +373,16 @@ pub fn scenario_plan(
 
     // A gate must see a fair window long enough to sail its leg before the
     // tide turns; size it from the longest gated leg at a conservative
-    // through-water speed, capped below a tidal half-cycle.
+    // through-water + fair-tide speed.
     let longest_gated_leg = pts
         .windows(2)
         .zip(&gates)
         .filter(|(_, &g)| g)
         .map(|(w, _)| (w[1].0 - w[0].0).hypot(w[1].1 - w[0].1))
         .fold(0.0_f64, f64::max);
-    let gate_window_s = (longest_gated_leg / 0.4).clamp(600.0, 10800.0);
+    let gate_window_s = (longest_gated_leg / 0.6).clamp(600.0, 9000.0);
 
-    write_planned_route(out_route, &route, &wind, &pts, &gates, GATE_THRESHOLD, gate_window_s)?;
+    write_planned_route(out_route, &route, &wind, &pts, &gates, GATE_OPEN_ALONG, gate_window_s)?;
     println!(
         "planned {} -> {}: {:.0} km, ETA {:.1} h ({} path pts, {} waypoints, {} tidal gates)",
         out_route.display(),
@@ -428,4 +439,33 @@ fn write_planned_route(
     writeln!(s, "loop: false").ok();
     std::fs::write(out, s).with_context(|| format!("writing planned route {}", out.display()))?;
     Ok(())
+}
+
+/// Split any leg longer than `max_len` into equal sub-legs, linearly
+/// interpolating the planner arrival time across the inserted points.
+/// Keeps every original point; only adds points on over-long legs.
+fn densify_legs(pts: &[(f64, f64)], times: &[f64], max_len: f64) -> (Vec<(f64, f64)>, Vec<f64>) {
+    let mut dp: Vec<(f64, f64)> = Vec::with_capacity(pts.len());
+    let mut dt: Vec<f64> = Vec::with_capacity(pts.len());
+    if pts.is_empty() {
+        return (dp, dt);
+    }
+    for i in 0..pts.len() - 1 {
+        let (ax, ay) = pts[i];
+        let (bx, by) = pts[i + 1];
+        dp.push(pts[i]);
+        dt.push(times[i]);
+        let len = (bx - ax).hypot(by - ay);
+        if len > max_len {
+            let n = (len / max_len).ceil() as usize;
+            for k in 1..n {
+                let f = k as f64 / n as f64;
+                dp.push((ax + (bx - ax) * f, ay + (by - ay) * f));
+                dt.push(times[i] + (times[i + 1] - times[i]) * f);
+            }
+        }
+    }
+    dp.push(*pts.last().unwrap());
+    dt.push(*times.last().unwrap());
+    (dp, dt)
 }
