@@ -301,7 +301,13 @@ impl RouteFollower {
             {
                 self.waiting_at_gate = true;
                 self.tack = Tack::None;
-                return Some((start.y - pos_y).atan2(start.x - pos_x));
+                return Some(station_keep_heading(
+                    (start.x, start.y),
+                    (pos_x, pos_y),
+                    current,
+                    true_wind,
+                    self.route.close_hauled_angle_deg,
+                ));
             }
             self.departed = true;
             self.waiting_at_gate = false;
@@ -341,7 +347,13 @@ impl RouteFollower {
             if is_gate && !self.gate_open_for_leg(target_idx, t, current, forecast) {
                 self.waiting_at_gate = true;
                 self.tack = Tack::None;
-                return Some((target.y - pos_y).atan2(target.x - pos_x));
+                return Some(station_keep_heading(
+                    (target.x, target.y),
+                    (pos_x, pos_y),
+                    current,
+                    true_wind,
+                    self.route.close_hauled_angle_deg,
+                ));
             }
             self.waiting_at_gate = false;
 
@@ -422,6 +434,54 @@ fn wrap_pi(x: f64) -> f64 {
     }
 }
 
+/// Heading (rad) to hold station over `gate` against a tidal `current` by
+/// ferry-gliding: command a through-water velocity that cancels the set
+/// plus a gentle pull back toward the point, i.e. point *into* the stream
+/// rather than at the point. Steering directly at a fixed point makes a
+/// boat with way-on overshoot and orbit it in a current (the wasted loops
+/// that stall a gated crossing); stemming the stream parks it instead. If
+/// the stem heading lands inside the no-go cone it's snapped to the nearer
+/// close-hauled limit so the boat keeps drive and loses the least ground.
+fn station_keep_heading(
+    gate: (f64, f64),
+    pos: (f64, f64),
+    current: (f64, f64),
+    true_wind: TrueWind,
+    close_hauled_deg: f64,
+) -> f64 {
+    // Gentle, capped recovery velocity (m/s) toward the gate point.
+    const RECOVER_GAIN: f64 = 0.05; // per-metre → m/s
+    const RECOVER_CAP: f64 = 0.15;
+    let (ex, ey) = (gate.0 - pos.0, gate.1 - pos.1);
+    let err = ex.hypot(ey);
+    let (rvx, rvy) = if err > 1e-6 {
+        let speed = (RECOVER_GAIN * err).min(RECOVER_CAP);
+        (ex / err * speed, ey / err * speed)
+    } else {
+        (0.0, 0.0)
+    };
+    // Ground velocity = water velocity + current; we want ground velocity
+    // to equal the recovery, so steer the water velocity recover − current.
+    let (wvx, wvy) = (rvx - current.0, rvy - current.1);
+    let desired = if wvx.hypot(wvy) > 1e-6 {
+        wvy.atan2(wvx)
+    } else {
+        ey.atan2(ex)
+    };
+    // Snap into sailable space if the stem heading is closer to the wind
+    // than the boat can point.
+    let wind_from = wrap_pi(true_wind.y.atan2(true_wind.x) + PI);
+    let close_hauled_rad = close_hauled_deg.to_radians();
+    let off = wrap_pi(desired - wind_from);
+    if off.abs() >= close_hauled_rad {
+        desired
+    } else if off >= 0.0 {
+        wrap_pi(wind_from + close_hauled_rad)
+    } else {
+        wrap_pi(wind_from - close_hauled_rad)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -472,12 +532,34 @@ mod tests {
             .expect("not finished");
         assert!(rf.waiting_at_gate(), "should wait at gate in foul tide");
         assert_eq!(rf.leg_index, 0, "must not advance past the gate");
-        assert!(h.abs() < 1e-9, "holds by pointing at the gate (due east)");
+        // Holds by stemming the foul (westward) stream → heads due east.
+        assert!(h.abs() < 1e-9, "stems the current to hold station");
 
         // Tide turns fair (eastward) → gate opens, leg advances.
         rf.update(100.0, 98.0, 0.0, wind, (0.6, 0.0), &TideForecast::None);
         assert!(!rf.waiting_at_gate(), "gate should open on fair tide");
         assert_eq!(rf.leg_index, 1, "advanced onto the next leg");
+    }
+
+    #[test]
+    fn station_keep_stems_current_and_snaps_to_sailable() {
+        // Wind from due east (+x) → no-go cone is ±45° around heading 0.
+        let wind = wind_from_deg(5.0, 0.0);
+
+        // On station, cross set to the north (+y): stem it by heading
+        // south (−π/2), which is well outside the no-go cone.
+        let h = station_keep_heading((0.0, 0.0), (0.0, 0.0), (0.0, 0.5), wind, 45.0);
+        assert!((wrap_pi(h + PI / 2.0)).abs() < 1e-9, "stems a northward set heading south");
+
+        // Foul set straight from the west would demand heading due east —
+        // dead into the wind. Snap to the nearer close-hauled limit (+45°).
+        let h2 = station_keep_heading((0.0, 0.0), (0.0, 0.0), (-0.5, 0.0), wind, 45.0);
+        assert!((h2 - PI / 4.0).abs() < 1e-9, "snaps an upwind stem to close-hauled");
+
+        // No current but pushed east of the gate: recover by heading back
+        // west toward the point (no orbiting).
+        let h3 = station_keep_heading((0.0, 0.0), (10.0, 0.0), (0.0, 0.0), wind, 45.0);
+        assert!(h3.cos() < -0.999, "recovers toward the gate when off-station");
     }
 
     #[test]
