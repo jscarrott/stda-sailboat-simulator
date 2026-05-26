@@ -219,6 +219,46 @@ impl RouteFollower {
         &self.route
     }
 
+    /// Destination (last waypoint) of the route being followed.
+    pub fn destination(&self) -> (f64, f64) {
+        let w = self.route.waypoints.last().expect("route has >= 2 waypoints");
+        (w.x, w.y)
+    }
+
+    /// Replace the unsailed remainder of the route with a freshly planned
+    /// `path` (start → … → destination, in world coords). Used by the
+    /// autopilot when a tidal gate has been held so long the original plan
+    /// is stale: rather than wait out a missed window, re-route from here.
+    ///
+    /// The first path point is the boat's current position (a hard
+    /// waypoint that anchors leg 0); interior points become fly-by; the
+    /// last stays hard (the destination). Gate flags are dropped — the new
+    /// path is already tide-aware by construction, so re-gating it would
+    /// just re-introduce the wait we're escaping. Leg/tack/gate state is
+    /// reset so the follower sails the new leg 0 cleanly.
+    pub fn replace_remaining(&mut self, path: &[(f64, f64)]) {
+        if path.len() < 2 {
+            return;
+        }
+        let n = path.len();
+        self.route.waypoints = path
+            .iter()
+            .enumerate()
+            .map(|(i, &(x, y))| Waypoint {
+                x,
+                y,
+                gate: false,
+                soft: i != 0 && i != n - 1,
+            })
+            .collect();
+        self.leg_index = 0;
+        self.tack = Tack::None;
+        self.last_tack_change_t = f64::NEG_INFINITY;
+        self.waiting_at_gate = false;
+        self.departed = true;
+        self.finished = false;
+    }
+
     pub fn current_leg(&self) -> Option<(Waypoint, Waypoint)> {
         if self.finished || self.leg_index + 1 >= self.route.waypoints.len() {
             None
@@ -538,6 +578,33 @@ mod tests {
         let mut rf2 = RouteFollower::new(route2);
         rf2.update(0.0, 105.0, 30.0, wind, (0.0, 0.0), &TideForecast::None);
         assert_eq!(rf2.leg_index, 0, "hard waypoint needs the acceptance circle");
+    }
+
+    #[test]
+    fn replace_remaining_swaps_route_and_resets_state() {
+        // Start on a gated route, get it into a waiting state, then
+        // re-route. The follower should adopt the new path (hard ends,
+        // soft interior), clear the gate wait, and steer the new leg 0.
+        let mut route = straight_route("replan", 0.0, 0.0, 100.0, 0.0);
+        route.waypoints[0].gate = true; // departure gate
+        let wind = wind_from_deg(5.0, 90.0);
+        let mut rf = RouteFollower::new(route);
+        rf.update(0.0, 0.0, 0.0, wind, (-0.5, 0.0), &TideForecast::None);
+        assert!(rf.waiting_at_gate(), "foul tide holds at the departure gate");
+
+        rf.replace_remaining(&[(0.0, 0.0), (50.0, 50.0), (100.0, 0.0)]);
+        assert!(!rf.waiting_at_gate(), "replanning clears the gate wait");
+        assert_eq!(rf.leg_index, 0);
+        assert!(!rf.finished());
+        let wps = &rf.route().waypoints;
+        assert_eq!(wps.len(), 3);
+        assert!(!wps[0].soft && !wps[0].gate, "first is a hard anchor");
+        assert!(wps[1].soft, "interior points fly-by");
+        assert!(!wps[2].soft, "destination stays hard");
+        assert_eq!(rf.destination(), (100.0, 0.0));
+        // It now steers the new leg rather than holding station.
+        let h = rf.update(1.0, 0.0, 0.0, wind, (-0.5, 0.0), &TideForecast::None);
+        assert!(h.is_some());
     }
 
     #[test]

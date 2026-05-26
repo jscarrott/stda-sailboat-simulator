@@ -5,7 +5,7 @@ use std::path::Path;
 
 use std::f64::consts::PI;
 
-use crate::autopilot::{Obstacle, RouteAutopilot};
+use crate::autopilot::{Obstacle, ReplanContext, RouteAutopilot};
 use crate::chart::Chart;
 use crate::config::{Config, Invariants};
 use crate::current_model::{CurrentModel, NoCurrent, TabulatedCurrent, TideForecast, TidalStream};
@@ -72,6 +72,7 @@ pub fn scenario_route(
     tide_data: Option<&Path>,
     crab: bool,
     solver: Solver,
+    replan_after_wait_s: Option<f64>,
 ) -> Result<RouteRun> {
     let route = Route::load(route_path)?;
     let chart = chart_path.map(Chart::load).transpose()?;
@@ -131,6 +132,24 @@ pub fn scenario_route(
         forecast,
         obstacles,
     );
+
+    // Opt-in mid-mission re-routing on a held tidal gate. Measuring the
+    // polar costs a handful of short sims, so it's done only when enabled.
+    if let Some(after_wait_s) = replan_after_wait_s {
+        let wind_speed = env.true_wind.strength;
+        let wind_from =
+            (env.true_wind.y.atan2(env.true_wind.x) + PI).rem_euclid(2.0 * PI) - PI;
+        let polar = Polar::new(scenario_polar(cfg, wind_speed, solver)?);
+        let dest_radius = route.acceptance_radius.max(400.0);
+        autopilot.enable_replanning(ReplanContext::new(
+            polar,
+            chart.clone(),
+            wind_from,
+            after_wait_s,
+            dest_radius,
+        ));
+    }
+
     let mut x0 = initial_state(cfg, true);
     if let Some(start) = route.waypoints.first() {
         x0[POS_X] = start.x;
@@ -307,6 +326,7 @@ pub fn scenario_plan(
         start,
         dest,
         wind_from,
+        start_time: 0.0,
         dt: 600.0,
         heading_step_deg: 5.0,
         cross_track_bucket_m: 500.0,

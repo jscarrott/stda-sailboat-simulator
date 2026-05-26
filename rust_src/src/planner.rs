@@ -70,6 +70,11 @@ pub struct PlanConfig {
     pub dest: (f64, f64),
     /// Direction the wind blows FROM (math angle, rad).
     pub wind_from: f64,
+    /// Wall-clock time (s) the plan starts at. The tide forecast is
+    /// queried at `start_time + node_elapsed`, so a mid-mission replan
+    /// sees the same tide phase the boat will actually meet. 0 for a
+    /// from-scratch plan at the start of the run.
+    pub start_time: f64,
     pub dt: f64,
     pub heading_step_deg: f64,
     pub cross_track_bucket_m: f64,
@@ -122,7 +127,7 @@ pub fn plan(
         let mut candidates: Vec<usize> = Vec::new();
         for &fi in &front {
             let (px, py, pt) = (arena[fi].x, arena[fi].y, arena[fi].t);
-            let (cx, cy) = forecast.at(pt).unwrap_or((0.0, 0.0));
+            let (cx, cy) = forecast.at(cfg.start_time + pt).unwrap_or((0.0, 0.0));
             for k in 0..n_head {
                 let h = (k as f64) * cfg.heading_step_deg.to_radians();
                 let twa = wrap_pi(h - cfg.wind_from).abs().to_degrees();
@@ -328,6 +333,7 @@ mod tests {
             start: (0.0, 0.0),
             dest: (-1000.0, 0.0),
             wind_from: 0.0,
+            start_time: 0.0,
             dt: 100.0,
             heading_step_deg: 10.0,
             cross_track_bucket_m: 100.0,
@@ -350,6 +356,7 @@ mod tests {
             start: (0.0, 0.0),
             dest: (2000.0, 0.0),
             wind_from: 0.0, // wind from +x; dest is at +x = straight upwind
+            start_time: 0.0,
             dt: 100.0,
             heading_step_deg: 5.0,
             cross_track_bucket_m: 200.0,
