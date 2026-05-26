@@ -10,7 +10,7 @@ Kohaut (MIT License, 2018) in Python; currently being ported to Rust.
 | Branch | Language | Source root | Status |
 |---|---|---|---|
 | `master` | Python 2 | `src/` | Original implementation; not Python 3 compatible |
-| `migrate-to-python3` | Python 3.11 | `sailboat_sim/` | Python 3 fixes applied; Poetry-managed |
+| `migrate-to-python3` | Python 3.11 | `sailboat_sim/` | Python 3 fixes applied; uv-managed |
 | `rust_implementation` | Rust + Python 3.11 | `rust_src/` + `sailboat_sim/` | Active development branch; Rust skeleton + Python reference |
 
 **Primary development branch: `rust_implementation`.**
@@ -148,24 +148,31 @@ No ODE solver crate is currently declared; one will need to be added (see
 
 ### Python reference
 
-The Python code lives in `sailboat_sim/` and is managed with Poetry from the repo root.
+The Python code lives in `sailboat_sim/` and is managed with [uv](https://docs.astral.sh/uv/)
+from the repo root (PEP 621 `pyproject.toml` + `uv.lock`).
 
 ```bash
-# Install dependencies (once)
-poetry install
+# Install dependencies into .venv (once; uv reads .python-version → 3.11)
+uv sync
 
 # Run from sailboat_sim/ — YAML loading requires this CWD
 cd sailboat_sim
-poetry run python run.py
+uv run python run.py
 ```
+
+The project is configured as a non-package (`[tool.uv] package = false`): the
+`sailboat_sim/` modules are run as loose scripts, not built/installed. The heavy
+CMEMS tide-fetch dependencies (`scripts/fetch_tides.py`) live in an optional
+`tides` dependency group — install them on demand with `uv sync --group tides`.
 
 `simulation.py` and `heading_controller.py` both open `sim_params_config.yaml` with a
 bare filename at module import time. The working directory **must** be `sailboat_sim/`
 or the import will raise `FileNotFoundError`.
 
-**Python dependencies** (from `pyproject.toml`):
-- `python = "^3.11"`
-- `numpy ^1.26.2`, `scipy ^1.11.4`, `matplotlib ^3.8.2`, `pyyaml ^6.0.1`
+**Python dependencies** (from `pyproject.toml`, exact versions pinned in `uv.lock`):
+- `requires-python >= 3.11`
+- `numpy`, `scipy`, `matplotlib`, `pyyaml`, `polars` (lower bounds only; `uv.lock` pins the rest)
+- optional `tides` group: `copernicusmarine`, `xarray`, `netcdf4`
 
 ---
 
@@ -173,8 +180,8 @@ or the import will raise `FileNotFoundError`.
 
 ```
 stda-sailboat-simulator/
-├── pyproject.toml           Poetry config (Python + polars deps)
-├── poetry.lock
+├── pyproject.toml           uv project config (PEP 621; Python deps + tides group)
+├── uv.lock                  uv lockfile (pinned, reproducible resolution)
 ├── .python-version          pyenv target: 3.11
 ├── LICENSE                  MIT, 2018 Simon Kohaut
 ├── rust_src/                Rust port (active development)

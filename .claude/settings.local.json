@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(jj status *)",
+      "Bash(jj --version)",
+      "Bash(jj op *)"
+    ]
+  }
+}
