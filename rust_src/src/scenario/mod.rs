@@ -14,7 +14,7 @@ use crate::physics::solve::initial_state;
 use crate::planner::{plan, simplify, simplify_idx, PlanConfig, Polar};
 use crate::route::{Route, WindOverride};
 use crate::state::{POS_X, POS_Y};
-use crate::wind_model::{ConstantWind, OrnsteinUhlenbeckWind, WindModel};
+use crate::wind_model::{ConstantWind, OrnsteinUhlenbeckWind, TabulatedWind, WindModel};
 
 pub use simulate::{simulate, SimResult, Solver};
 
@@ -70,6 +70,7 @@ pub fn scenario_route(
     variance: Option<WindVariance>,
     tide: Option<TidalParams>,
     tide_data: Option<&Path>,
+    wind_data: Option<&Path>,
     crab: bool,
     solver: Solver,
     replan_after_wait_s: Option<f64>,
@@ -84,21 +85,29 @@ pub fn scenario_route(
         env.true_wind = w.to_true_wind();
     }
 
-    // Build the wind model. If variance is disabled (the default), use
-    // the constant wind already stored in env; otherwise wrap it in an
-    // OU process whose mean matches.
-    let mean_speed = env.true_wind.strength;
-    let mean_dir = env.true_wind.y.atan2(env.true_wind.x);
-    let mut wind_model: Box<dyn WindModel> = match variance {
-        Some(v) if !v.is_disabled() => Box::new(OrnsteinUhlenbeckWind::new(
-            mean_speed,
-            mean_dir,
-            v.speed_sigma,
-            v.direction_sigma_rad,
-            v.correlation_time_s,
-            v.seed,
-        )),
-        _ => Box::new(ConstantWind::new(env.true_wind)),
+    // Build the wind model. Precedence: a --wind-data cache (real Open-Meteo
+    // forecast) wins, since real wind beats any stochastic placeholder; else
+    // OU if variance is configured; else the constant already stored in env.
+    let mut wind_model: Box<dyn WindModel> = if let Some(path) = wind_data {
+        let mut tw = TabulatedWind::load(path)?;
+        // Seed env.true_wind from the forecast at t=0 so the first step has
+        // the right wind even before simulate() ticks the model.
+        env.true_wind = tw.sample(0.0, 0.0);
+        Box::new(tw)
+    } else {
+        let mean_speed = env.true_wind.strength;
+        let mean_dir = env.true_wind.y.atan2(env.true_wind.x);
+        match variance {
+            Some(v) if !v.is_disabled() => Box::new(OrnsteinUhlenbeckWind::new(
+                mean_speed,
+                mean_dir,
+                v.speed_sigma,
+                v.direction_sigma_rad,
+                v.correlation_time_s,
+                v.seed,
+            )),
+            _ => Box::new(ConstantWind::new(env.true_wind)),
+        }
     };
 
     // Build the tidal-current model. A --tide-data cache (real CMEMS

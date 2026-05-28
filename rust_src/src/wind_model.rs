@@ -1,12 +1,17 @@
-//! Wind models for the simulator's environment. Two impls so far:
-//! [`ConstantWind`] (used when a route has no variance configured) and
-//! [`OrnsteinUhlenbeckWind`] (mean-reverting gust + shift noise).
+//! Wind models for the simulator's environment. Three impls so far:
+//! [`ConstantWind`] (used when a route has no variance configured),
+//! [`OrnsteinUhlenbeckWind`] (mean-reverting gust + shift noise), and
+//! [`TabulatedWind`] (a cached real-world forecast series).
 //!
 //! The model is ticked once per outer control step in `simulate()`,
 //! and the resulting `TrueWind` is what the physics ODE sees plus what
 //! the autopilot reads (after rotation into body frame).
 
 use std::f64::consts::PI;
+use std::path::Path;
+
+use anyhow::{Context, Result};
+use serde::Deserialize;
 
 use crate::physics::wind::TrueWind;
 
@@ -97,6 +102,53 @@ impl WindModel for OrnsteinUhlenbeckWind {
             strength: self.speed,
             direction: self.direction.to_degrees(),
         }
+    }
+}
+
+/// A wind series cached from a real-world forecast (e.g. Open-Meteo via
+/// `scripts/fetch_wind.py`): uniform in space, linearly interpolated in time.
+/// `t = 0` maps to the first sample; before/after the series the endpoints
+/// are held. Mirrors `current_model::TabulatedCurrent`.
+#[derive(Deserialize)]
+pub struct TabulatedWind {
+    dt_s: f64,
+    u_east: Vec<f64>,
+    v_north: Vec<f64>,
+}
+
+impl TabulatedWind {
+    pub fn load(path: &Path) -> Result<Self> {
+        let file = std::fs::File::open(path)
+            .with_context(|| format!("opening wind data {}", path.display()))?;
+        let w: TabulatedWind = serde_json::from_reader(file)
+            .with_context(|| format!("parsing wind data {}", path.display()))?;
+        anyhow::ensure!(
+            !w.u_east.is_empty() && w.u_east.len() == w.v_north.len() && w.dt_s > 0.0,
+            "wind data {} must have matching non-empty u/v and dt_s>0",
+            path.display()
+        );
+        Ok(w)
+    }
+}
+
+impl WindModel for TabulatedWind {
+    fn sample(&mut self, t: f64, _dt: f64) -> TrueWind {
+        let n = self.u_east.len();
+        let f = (t / self.dt_s).clamp(0.0, (n - 1) as f64);
+        let i = f.floor() as usize;
+        let (u, v) = if i + 1 >= n {
+            (self.u_east[n - 1], self.v_north[n - 1])
+        } else {
+            let frac = f - i as f64;
+            (
+                self.u_east[i] + (self.u_east[i + 1] - self.u_east[i]) * frac,
+                self.v_north[i] + (self.v_north[i + 1] - self.v_north[i]) * frac,
+            )
+        };
+        let strength = (u * u + v * v).sqrt();
+        // TrueWind.direction is the math angle of the velocity vector (deg).
+        let direction = v.atan2(u).to_degrees();
+        TrueWind { x: u, y: v, strength, direction }
     }
 }
 

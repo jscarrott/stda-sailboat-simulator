@@ -85,6 +85,13 @@ struct Cli {
     #[arg(long)]
     tide_data: Option<PathBuf>,
 
+    /// Real wind-forecast time series (JSON from scripts/fetch_wind.py —
+    /// Open-Meteo / ECMWF IFS). Drives the boat with the cached forecast
+    /// instead of constant or Ornstein–Uhlenbeck wind, taking precedence
+    /// over the route YAML's `wind:` block and any --wind-deg/--wind-speed.
+    #[arg(long)]
+    wind_data: Option<PathBuf>,
+
     /// Inner ODE solver: `dopri5` (adaptive, accurate, may fail with
     /// StiffnessDetected on aggressive IOM dynamics) or `rk4`
     /// (fixed-step, no stiffness check, trades accuracy for robustness).
@@ -203,6 +210,7 @@ fn main() -> Result<()> {
                 Some(variance),
                 Some(tide),
                 cli.tide_data.as_deref(),
+                cli.wind_data.as_deref(),
                 cli.crab,
                 solver,
                 cli.replan_on_gate.then_some(cli.replan_after_wait_s),
@@ -342,6 +350,7 @@ fn main() -> Result<()> {
                     Some(variance),
                     Some(tide),
                     cli.tide_data.as_deref(),
+                    cli.wind_data.as_deref(),
                     cli.crab,
                     solver,
                     cli.replan_on_gate.then_some(cli.replan_after_wait_s),
