@@ -17,6 +17,7 @@ config     := 'sim_params_config.yaml'   # 4 m hull (default scenarios)
 iom_config := 'sim_params_iom.yaml'      # 1 m IOM pond boat
 chart      := 'charts/north_devon.json'  # Lundy + N. Devon coastline overlay
 tide_data  := 'charts/lundy_tides.json'  # produced by `just fetch-tides`
+wind_data  := 'charts/lundy_wind.json'   # produced by `just fetch-wind`
 run        := 'cargo run --release -q --'
 
 # List available recipes.
@@ -110,6 +111,14 @@ polar wind_speed='4.0' cfg=config:
 fetch-tides start days='3':
     uv run --group tides python scripts/fetch_tides.py --start {{start}} --days {{days}}
 
+# Fetch a forecast wind series from Open-Meteo (ECMWF IFS 10 m) -> charts/lundy_wind.json.
+# Free, no account, stdlib-only — a single HTTPS GET. Usage: `just fetch-wind 2026-05-27 7`.
+# If the file exists when you run `just lundy-tides`, the fleet drives off the real
+# forecast wind automatically (otherwise it falls back to each route's wind: block).
+[doc('Fetch Open-Meteo forecast wind -> charts/lundy_wind.json')]
+fetch-wind start days='7':
+    uv run python scripts/fetch_wind.py --start {{start}} --days {{days}}
+
 # Re-fetch the North Devon + Lundy coastline overlay -> charts/north_devon.json.
 fetch-coastline:
     uv run python scripts/fetch_coastline.py
@@ -129,7 +138,10 @@ lundy-tides sizes='2.5 3.0 4.0' time='400000':
         uv run python scripts/scale_hull.py --length "$L" --out "/tmp/${L}m.yaml" >/dev/null
         cfgs="$cfgs,/tmp/${L}m.yaml"
     done
+    # Pick up the forecast wind too if it's been fetched.
+    wind_flags=""
+    if [ -f "{{wind_data}}" ]; then wind_flags="--wind-data {{wind_data}}"; fi
     {{run}} --scenario fleet --fleet-configs "$cfgs" \
         --route routes/ilfracombe_to_lundy.yaml --chart {{chart}} \
-        --tide-data {{tide_data}} --solver rk4 --max-run-time-s {{time}} \
+        --tide-data {{tide_data}} $wind_flags --solver rk4 --max-run-time-s {{time}} \
         --out figs/fleet_lundy.png
