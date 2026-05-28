@@ -381,6 +381,23 @@ fn main() -> Result<()> {
                 tracks.iter().map(|(l, r)| (l.clone(), r)).collect();
             plot::plot_fleet(&refs, &route, chart.as_ref(), &out)?;
             println!("wrote {}", out.display());
+            // Also emit a self-contained interactive HTML next to the PNG —
+            // pan/zoom into Lundy detail, hover any track for time/speed/trim.
+            // If a wind forecast was used, include it as an inset so loops
+            // can be correlated with the wind series.
+            let html_out = out.with_extension("html");
+            let title = match chart.as_ref() {
+                Some(c) => format!("Fleet: {} on {}", route.name, c.name),
+                None => format!("Fleet: {}", route.name),
+            };
+            let wind_series = cli.wind_data.as_deref().map(plot::load_wind_series).transpose()?;
+            let tide_series = cli.tide_data.as_deref().map(plot::load_tide_series).transpose()?;
+            plot::write_fleet_html(
+                &refs, &route, chart.as_ref(),
+                wind_series.as_ref(), tide_series.as_ref(),
+                &title, &html_out,
+            )?;
+            println!("wrote {}", html_out.display());
         }
         other => bail!("unknown scenario {other:?}; supported: route, polar, plan, fleet"),
     }
