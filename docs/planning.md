@@ -203,6 +203,35 @@ losing as little ground as possible.
 
 ![Ferry-glide hold vs orbiting the gate point](diagrams/ferry_glide.svg)
 
+## Replanning when the forecast turns out wrong (opt-in)
+
+A gate is a bet that the tide will behave as the forecast said. If the
+forecast is right, the gate opens when expected and the boat continues.
+If the forecast is wrong — the foul phase ran longer than predicted, or
+the boat got to the gate hours later than planned because of a slow leg
+earlier — the gate just sits there, ferry-gliding, waiting for a fair
+window that never comes.
+
+Enable `--replan-on-gate` and the autopilot stops waiting after
+`--replan-after-wait-s` seconds (default an hour). It tears up the
+unsailed portion of the plan and runs a fresh isochrone search from
+the boat's *current* position, with the *current* time and tide phase.
+The new path replaces the abandoned waypoints; the boat just keeps
+sailing, now following the new plan.
+
+The new plan typically looks different from the original because the
+search starts from a different place and a different tide phase: it
+may need no gate, a different gate, or a different tack pattern.
+What it always has in common with the original is the destination.
+
+![Replan: original plan with a stale gate (left); fresh plan from the boat's actual position (right)](diagrams/replan.svg)
+
+Replanning isn't free — the planner measures the boat's polar up front
+when this is first enabled (a handful of short sims), and each replan
+runs the same isochrone search the original plan did. So it's opt-in:
+useful for long passages where forecast drift is plausible, overkill
+for short hops.
+
 ## What the planner doesn't do
 
 - **It plans space, not time.** It doesn't pick your departure hour.
@@ -214,11 +243,9 @@ losing as little ground as possible.
   actual speed will differ.
 - **It samples one tide cycle for gate decisions.** It doesn't reason
   about spring vs. neap, or stack multi-day forecasts.
-- **It doesn't replan on its own.** If you opt in, the autopilot will
-  tear up the plan and run the search again from the boat's current
-  position when a held gate has waited well past its expected window
-  (the forecast turned out wrong, or the boat got there much later
-  than planned).
+- **It doesn't replan on its own.** Replanning is opt-in (see the
+  section above); without it, a stale gate will hold the boat until
+  the tide eventually does turn fair.
 - **It doesn't model wave-making, leeway, or sail trim limits beyond
   the polar.** Those are the follower's and the simulator's job.
 
@@ -231,6 +258,8 @@ User-facing knobs (CLI flags or route-file fields):
 | `--polar-derate` | Scales the planner's speed model. Lower = more conservative ETAs and longer detours to avoid foul tide. |
 | `--plan-tidal-gates` | Turn gate placement on or off entirely. |
 | `--crab` | Aim slightly into the tide so the ground track stays on the rhumb line (off by default; see "Crabbing into the tide" above). |
+| `--replan-on-gate` | Allow the autopilot to re-run the planner from the boat's current position if a held gate doesn't open within `--replan-after-wait-s`. |
+| `--replan-after-wait-s` | How long a gate is allowed to hold past its expected window before the replan fires. |
 | `xte_lookahead` (route) | The floor for the follower's line-tracking aggressiveness. The follower opens it up per-leg but never tightens below this. |
 | `min_tack_duration_s` (route) | The floor for how long the boat commits to a tack. The planner raises it on long legs. |
 | `gate_open_along_current` (route) | How fair the tide must be before a held gate opens. |
