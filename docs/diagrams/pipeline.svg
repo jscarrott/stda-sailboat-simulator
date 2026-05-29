@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 660" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#333"/>
+    </marker>
+  </defs>
+
+  <!-- Inputs -->
+  <polygon points="100,20 420,20 400,70 80,70" fill="#fffbe6" stroke="#333"/>
+  <text x="250" y="42" text-anchor="middle" font-weight="bold">Inputs</text>
+  <text x="250" y="60" text-anchor="middle">start, dest, wind, polar, tide forecast</text>
+  <line x1="250" y1="70" x2="250" y2="93" stroke="#333" marker-end="url(#arrow)"/>
+
+  <!-- Isochrone search -->
+  <rect x="100" y="100" width="300" height="60" rx="4" fill="#e6f4ff" stroke="#333"/>
+  <text x="250" y="125" text-anchor="middle" font-weight="bold">Isochrone search</text>
+  <text x="250" y="143" text-anchor="middle">tide-aware, polar-driven (planner.rs:123)</text>
+  <text x="250" y="157" text-anchor="middle" font-size="11" fill="#666">prune per cross-track bucket</text>
+  <line x1="250" y1="160" x2="250" y2="183" stroke="#333" marker-end="url(#arrow)"/>
+
+  <!-- RDP -->
+  <rect x="100" y="190" width="300" height="60" rx="4" fill="#e6f4ff" stroke="#333"/>
+  <text x="250" y="215" text-anchor="middle" font-weight="bold">RDP simplify (ε = 250 m)</text>
+  <text x="250" y="233" text-anchor="middle">keep tack apexes (planner.rs:303)</text>
+  <line x1="250" y1="250" x2="250" y2="283" stroke="#333" marker-end="url(#arrow)"/>
+
+  <!-- Densify (gated only) -->
+  <rect x="100" y="290" width="300" height="60" rx="4" fill="#fff1e6" stroke="#333" stroke-dasharray="5 3"/>
+  <text x="250" y="315" text-anchor="middle" font-weight="bold">Densify legs &gt; 5 km</text>
+  <text x="250" y="333" text-anchor="middle" font-size="12">into sub-legs (scenario/mod.rs:511)</text>
+  <line x1="250" y1="350" x2="250" y2="383" stroke="#333" marker-end="url(#arrow)"/>
+
+  <!-- Gate decisions (gated only) -->
+  <rect x="100" y="390" width="300" height="60" rx="4" fill="#fff1e6" stroke="#333" stroke-dasharray="5 3"/>
+  <text x="250" y="415" text-anchor="middle" font-weight="bold">Gate decisions</text>
+  <text x="250" y="433" text-anchor="middle" font-size="12">foul over a tide cycle (planner.rs:346)</text>
+
+  <!-- Annotation -->
+  <text x="430" y="320" font-size="11" fill="#996600" font-style="italic">dashed:</text>
+  <text x="430" y="335" font-size="11" fill="#996600" font-style="italic">only with</text>
+  <text x="430" y="350" font-size="11" fill="#996600" font-style="italic">--plan-</text>
+  <text x="430" y="365" font-size="11" fill="#996600" font-style="italic">tidal-gates</text>
+
+  <line x1="250" y1="450" x2="250" y2="483" stroke="#333" marker-end="url(#arrow)"/>
+
+  <!-- Scale min_tack -->
+  <rect x="100" y="490" width="300" height="60" rx="4" fill="#e6f4ff" stroke="#333"/>
+  <text x="250" y="515" text-anchor="middle" font-weight="bold">Scale min_tack_duration_s</text>
+  <text x="250" y="533" text-anchor="middle">to longest leg</text>
+  <line x1="250" y1="550" x2="250" y2="583" stroke="#333" marker-end="url(#arrow)"/>
+
+  <!-- Emit -->
+  <polygon points="100,590 420,590 400,640 80,640" fill="#e8f5e9" stroke="#333"/>
+  <text x="250" y="612" text-anchor="middle" font-weight="bold">Write YAML route</text>
+  <text x="250" y="628" text-anchor="middle" font-size="11" fill="#555">waypoints + gates + scaled params</text>
+</svg>

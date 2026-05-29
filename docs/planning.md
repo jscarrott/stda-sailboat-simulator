@@ -31,21 +31,7 @@ tides and gusts the planner only knew about as a forecast.
 
 ## Pipeline at a glance
 
-```mermaid
-flowchart TD
-    in[/start, dest, wind,<br/>polar, tide forecast/]
-    s[Isochrone search<br/>planner.rs:123]
-    rdp["RDP simplify ε=250 m<br/>planner.rs:303"]
-    g{--plan-tidal-gates?}
-    dens[Sub-divide legs &gt; 5 km<br/>scenario/mod.rs:511]
-    gate[Gate decisions:<br/>foul-over-cycle, planner.rs:346]
-    scale[Scale min_tack_duration_s<br/>to longest leg]
-    emit[/Write YAML route/]
-    in --> s --> rdp --> g
-    g -- yes --> dens --> gate --> scale
-    g -- no --> scale
-    scale --> emit
-```
+![Planning pipeline](diagrams/pipeline.svg)
 
 Each step is detailed below.
 
@@ -89,25 +75,7 @@ The search terminates when any frontier node lands inside `dest_radius`
 of the destination, then back-tracks via `parent` to build the path
 (`backtrack`, `planner.rs:190`).
 
-```
-   Expansion of one frontier node (·):              Bucket-pruning the new
-                                                    isochrone (one row,
-              · · · ·  ← n_head candidates,         buckets perpendicular
-            · · · · ·    one per heading;           to the start→dest axis):
-           · · · · · ·   tide drift added to
-           · · ●  · · ·  each; drop in-no-go         │   │   │   │   │   │
-            · · · · ·    (polar = 0) and any        ◯  │ ◯ │   │ ◯ │   │ ◯
-              · · · ·    segment hitting land.       │ · │ · │ ◯ │ · │ ◯ │
-                                                     │   │ · │ · │   │ · │
-                                                     │   │   │   │   │   │
-                                                       ↑               ↑
-                                                 kept (◯): greatest along-
-                                                 axis offset in its bucket.
-                                                 Others (·) are dominated
-                                                 and dropped.
-
-   start ●─────────────────── along-track axis ───────────────────● dest
-```
+![Isochrone expansion and bucket pruning](diagrams/isochrone.svg)
 
 ## Step 2 — Simplify (RDP)
 
@@ -123,25 +91,7 @@ across the zigzag tacks and force the follower to add its own tacking
 between waypoints; RDP keeps each emitted leg a clean single tack the
 follower steers directly.
 
-```
-   dense path from search                  RDP-simplified (ε ≈ 250 m)
-   (one point per Δt):                     waypoints emitted:
-
-         · · · ·                              ●
-       · ·     · ·                            ╲
-      ·         · ·                            ╲
-     ·            ·                             ●
-    ●              ·                            ╱
-                     · ·                       ╱
-                        · · ·                 ●
-                              · · ·            ╲
-                                    · · ●       ●
-   start                          destination   destination
-                                                 (start = ●)
-
-   Interior points within ε of the chord between kept neighbours
-   are dropped; tack apexes survive.
-```
+![RDP simplification: dense path to tack apexes](diagrams/rdp.svg)
 
 ## Step 3 — Densify long legs (only when gating)
 
@@ -161,27 +111,7 @@ stays fair through the next sub-leg.
 This step is skipped without gating, so a plain `--scenario plan` keeps
 its RDP-simplified legs unchanged.
 
-```
-   Before (one ~21 km leg):
-
-     wp_a ●─────────────────────────────────────────────────● wp_b
-          ←──────── committed as a single sail in one go ──→
-
-   After densify_legs (GATE_MAX_LEG_M = 5 km):
-
-     wp_a ●─────●─────●─────●─────●─────● wp_b
-            5km   5km   5km   5km   5km
-
-   tidal_gate_flags then marks any tide-exposed sub-leg as a gate (║):
-
-     wp_a ●═════●═════●═════●═════●═════● wp_b
-          ║     ║     ║     ║     ║      
-        gate  gate  gate  gate  gate
-
-   Fair phase: gates open as the boat arrives, it chains through.
-   Foul phase: boat holds at the most recently captured gate (sub-leg
-   bounded → only ever one fair-tide window's worth of commitment).
-```
+![Densify a long leg into sub-legs, gate the tide-exposed ones](diagrams/densify_gates.svg)
 
 ## Step 4 — Decide tidal gates
 
@@ -224,26 +154,7 @@ A/B-validated regime boundaries:
   foul beats getting pushed backward; the gated route reaches further
   than the same route ungated.
 
-```
-   along-leg current over one 12.42 h cycle, two example legs:
-
-   fair  +V ┤        ⌢                            (strong foul: gated)
-            │     ⌢     ⌢            ⌢
-         0  ┼──┴────────────┴──────┴────────────┴──── time →
-            │              ⌣          ⌣
-         −V ┤        ⌣                       ⌣  
-   foul     │   (min < −foul_margin → gate)
-
-   fair  +V ┤
-            │            ⌢       ⌢                   (weak: NOT gated)
-         0  ┼──────────────────────────────── time →
-            │  ⌣      ⌣      ⌣           ⌣
-         −V ┤
-            │              ↑
-                      |min| stays below foul_margin
-
-   gate_foul_margin = clamp(0.9 · boat_nominal_speed, 0.25, 1.2) m/s
-```
+![Gate decision: along-current over a tidal cycle vs. foul margin](diagrams/gate_cycle.svg)
 
 ## Step 5 — Scale `min_tack_duration_s`
 
@@ -297,25 +208,7 @@ than configured), the cap prevents arbitrarily large lookaheads. Long
 open legs foot; short approach legs track; the planner only has to
 emit the floor.
 
-```
-   Long leg (10 km), boat 50 m off track:
-                                                          eff = 1000 m
-   ●═══════════════════════════════════════════════════════════════●
-                                                      ↑
-                                                      │ chi_los rotated
-                                                      │ ~3° toward the line
-            · boat ────────────────────────────────────╱  (footing for speed)
-
-   Short leg (100 m), boat 50 m off track:                    
-                                                              eff = 100 m
-   ●═══════════════════════════════════════════════════● (floor)
-        ↑                                                  
-        │ chi_los rotated ~73°                             
-        │ back to the line                                 
-       · boat (tracking tightly →                          
-              clears the island on                         
-              the final approach)                          
-```
+![Per-leg adaptive XTE lookahead: loose on long legs, tight on short](diagrams/per_leg_xte.svg)
 
 ## Step 8 — Holds station-keep, not orbit
 
@@ -332,22 +225,7 @@ drive and loses the least ground. The autopilot skips its crab
 compensation while a hold is active because the stem heading is
 already a water-frame command, not a course over ground.
 
-```
-   "Point at the gate" (old):                  Ferry-glide (current):
-
-         tide → → → → →                            tide → → → → →
-                                                            
-              ╱─→ ╲                                          
-          boat    ↓ swept past                       ← boat heading
-            ↑     →                                  (water velocity
-       ↖    │     ╱  orbits the                      = −tide + small
-        ╲   │    ↙   gate as                         recovery toward
-         ╲  │   ↙    way-on +                        the gate)
-          ╲ │  ↙     tide drag it                       
-           ●        around the                          ●  (boat parks
-         gate       point.                            gate  here: ground
-                                                            velocity ≈ 0)
-```
+![Ferry-glide hold vs orbiting the gate point](diagrams/ferry_glide.svg)
 
 ## What the planner does *not* do
 

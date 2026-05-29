@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <text x="380" y="20" text-anchor="middle" font-weight="bold" font-size="14">Step 4 — Gate a leg when its along-current goes strongly foul at some phase</text>
+
+  <!-- Common defs: foul margin band style -->
+  <defs>
+    <pattern id="hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#cc3333" stroke-width="1" opacity="0.35"/>
+    </pattern>
+  </defs>
+
+  <!-- TOP PLOT: gated leg -->
+  <g transform="translate(60,55)">
+    <text x="0" y="-15" font-weight="bold">Tide-exposed leg → gated</text>
+    <!-- axes -->
+    <line x1="0" y1="80" x2="640" y2="80" stroke="#333" stroke-width="1"/>     <!-- t axis at v=0 -->
+    <line x1="0" y1="10" x2="0" y2="150" stroke="#333" stroke-width="1"/>      <!-- y axis -->
+    <text x="-8" y="14" text-anchor="end" font-size="11">+V (fair)</text>
+    <text x="-8" y="146" text-anchor="end" font-size="11">−V (foul)</text>
+    <text x="640" y="100" font-size="11">→ time (12.42 h)</text>
+
+    <!-- foul-margin band -->
+    <rect x="0" y="105" width="640" height="45" fill="url(#hatch)"/>
+    <line x1="0" y1="105" x2="640" y2="105" stroke="#cc3333" stroke-dasharray="4 3"/>
+    <text x="645" y="109" font-size="11" fill="#cc3333">−foul_margin</text>
+
+    <!-- sine curve oscillating ±60 around y=80 -->
+    <path d="M 0,80 Q 80,5 160,80 T 320,80 T 480,80 T 640,80" fill="none" stroke="#1a73e8" stroke-width="2"/>
+
+    <!-- annotation arrow to min -->
+    <line x1="240" y1="155" x2="240" y2="145" stroke="#cc3333" stroke-width="1" marker-end="url(#arr2)"/>
+    <text x="240" y="175" text-anchor="middle" font-size="11" fill="#cc3333">min &lt; −foul_margin → gate this leg</text>
+  </g>
+
+  <!-- BOTTOM PLOT: not gated -->
+  <g transform="translate(60,260)">
+    <text x="0" y="-15" font-weight="bold">Weak / cross-tide leg → NOT gated</text>
+    <line x1="0" y1="80" x2="640" y2="80" stroke="#333" stroke-width="1"/>
+    <line x1="0" y1="10" x2="0" y2="150" stroke="#333" stroke-width="1"/>
+    <text x="-8" y="14" text-anchor="end" font-size="11">+V (fair)</text>
+    <text x="-8" y="146" text-anchor="end" font-size="11">−V (foul)</text>
+    <text x="640" y="100" font-size="11">→ time (12.42 h)</text>
+
+    <rect x="0" y="105" width="640" height="45" fill="url(#hatch)"/>
+    <line x1="0" y1="105" x2="640" y2="105" stroke="#cc3333" stroke-dasharray="4 3"/>
+    <text x="645" y="109" font-size="11" fill="#cc3333">−foul_margin</text>
+
+    <!-- small sine: ±20 -->
+    <path d="M 0,80 Q 80,55 160,80 T 320,80 T 480,80 T 640,80" fill="none" stroke="#1a73e8" stroke-width="2"/>
+
+    <text x="320" y="175" text-anchor="middle" font-size="11" fill="#555" font-style="italic">|along-current| stays inside the foul margin → boat can sail through</text>
+  </g>
+
+  <!-- footer -->
+  <text x="380" y="405" text-anchor="middle" font-size="11" fill="#555">
+    gate_foul_margin = clamp(0.9 · nominal boat speed, 0.25, 1.2) m/s
+  </text>
+
+  <!-- arrow marker -->
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#cc3333"/>
+    </marker>
+  </defs>
+</svg>

@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <text x="380" y="20" text-anchor="middle" font-weight="bold" font-size="14">Steps 3 &amp; 4 — Densify long legs, then gate the tide-exposed ones</text>
+
+  <!-- Row 1: before -->
+  <g transform="translate(0,60)">
+    <text x="40" y="0" font-weight="bold">Before</text>
+    <text x="40" y="16" font-size="11" fill="#555">a 21 km RDP leg sailed in one commit</text>
+    <line x1="60" y1="40" x2="700" y2="40" stroke="#1a73e8" stroke-width="2"/>
+    <circle cx="60"  cy="40" r="7" fill="#222"/>
+    <circle cx="700" cy="40" r="7" fill="#222"/>
+    <text x="60"  y="68" text-anchor="middle" font-size="11">wp_a</text>
+    <text x="700" y="68" text-anchor="middle" font-size="11">wp_b</text>
+    <text x="380" y="32" text-anchor="middle" font-size="11" fill="#1a73e8">21 km — one leg</text>
+  </g>
+
+  <!-- Row 2: after densify -->
+  <g transform="translate(0,140)">
+    <text x="40" y="0" font-weight="bold">After densify_legs (GATE_MAX_LEG_M = 5 km)</text>
+    <text x="40" y="16" font-size="11" fill="#555">sub-legs ≤ 5 km; planner arrival times interpolated</text>
+    <line x1="60" y1="40" x2="700" y2="40" stroke="#1a73e8" stroke-width="2"/>
+    <circle cx="60"  cy="40" r="7" fill="#222"/>
+    <circle cx="700" cy="40" r="7" fill="#222"/>
+    <!-- 4 interior sub-points -->
+    <g fill="#1a73e8" stroke="#0b3d8c" stroke-width="1.2">
+      <circle cx="188" cy="40" r="5"/>
+      <circle cx="316" cy="40" r="5"/>
+      <circle cx="444" cy="40" r="5"/>
+      <circle cx="572" cy="40" r="5"/>
+    </g>
+    <!-- distance labels under each segment -->
+    <g font-size="10" fill="#555" text-anchor="middle">
+      <text x="124" y="58">5 km</text>
+      <text x="252" y="58">5 km</text>
+      <text x="380" y="58">5 km</text>
+      <text x="508" y="58">5 km</text>
+      <text x="636" y="58">~4 km</text>
+    </g>
+  </g>
+
+  <!-- Row 3: gated -->
+  <g transform="translate(0,230)">
+    <text x="40" y="0" font-weight="bold">After tidal_gate_flags</text>
+    <text x="40" y="16" font-size="11" fill="#555">sub-leg goes foul (along-current &lt; −foul_margin) at some phase → gate</text>
+    <line x1="60" y1="40" x2="700" y2="40" stroke="#1a73e8" stroke-width="2"/>
+    <circle cx="60"  cy="40" r="7" fill="#222"/>
+    <circle cx="700" cy="40" r="7" fill="#222"/>
+    <!-- gates: a small "tower" symbol -->
+    <g>
+      <line x1="188" y1="20" x2="188" y2="60" stroke="#cc6600" stroke-width="3"/>
+      <line x1="184" y1="22" x2="192" y2="22" stroke="#cc6600" stroke-width="2"/>
+      <line x1="184" y1="58" x2="192" y2="58" stroke="#cc6600" stroke-width="2"/>
+      <text x="188" y="78" text-anchor="middle" font-size="10" fill="#cc6600">gate</text>
+    </g>
+    <g>
+      <line x1="316" y1="20" x2="316" y2="60" stroke="#cc6600" stroke-width="3"/>
+      <line x1="312" y1="22" x2="320" y2="22" stroke="#cc6600" stroke-width="2"/>
+      <line x1="312" y1="58" x2="320" y2="58" stroke="#cc6600" stroke-width="2"/>
+      <text x="316" y="78" text-anchor="middle" font-size="10" fill="#cc6600">gate</text>
+    </g>
+    <g>
+      <line x1="444" y1="20" x2="444" y2="60" stroke="#cc6600" stroke-width="3"/>
+      <line x1="440" y1="22" x2="448" y2="22" stroke="#cc6600" stroke-width="2"/>
+      <line x1="440" y1="58" x2="448" y2="58" stroke="#cc6600" stroke-width="2"/>
+      <text x="444" y="78" text-anchor="middle" font-size="10" fill="#cc6600">gate</text>
+    </g>
+    <g>
+      <line x1="572" y1="20" x2="572" y2="60" stroke="#cc6600" stroke-width="3"/>
+      <line x1="568" y1="22" x2="576" y2="22" stroke="#cc6600" stroke-width="2"/>
+      <line x1="568" y1="58" x2="576" y2="58" stroke="#cc6600" stroke-width="2"/>
+      <text x="572" y="78" text-anchor="middle" font-size="10" fill="#cc6600">gate</text>
+    </g>
+    <text x="380" y="105" text-anchor="middle" font-size="11" fill="#555" font-style="italic">
+      Fair phase → boat rides through several open gates. Foul phase → boat holds at the most recently captured gate.
+    </text>
+  </g>
+</svg>
