@@ -73,7 +73,7 @@ of the destination, then back-tracks via `parent` to build the path
 
 The raw path has one point per `dt` step — far too dense to feed the
 follower as waypoints. `simplify_idx` (`planner.rs:303`) runs Ramer-
-Douglas-Peucker with `epsilon = 250 m` (`scenario/mod.rs:345`) and
+Douglas-Peucker with `epsilon = 250 m` (`scenario/mod.rs:354`) and
 returns indices into the dense path. Per-point side data (here: the
 planner's arrival times) ride through the simplification by indexing.
 
@@ -85,7 +85,7 @@ follower steers directly.
 
 ## Step 3 — Densify long legs (only when gating)
 
-When `--plan-tidal-gates` is on, `densify_legs` (`scenario/mod.rs:468`)
+When `--plan-tidal-gates` is on, `densify_legs` (`scenario/mod.rs:511`)
 splits any leg longer than `GATE_MAX_LEG_M = 5000 m` into equal
 sub-legs, linearly interpolating the planner's arrival times across the
 inserted points.
@@ -163,7 +163,7 @@ The `xte_lookahead` is **not** scaled at the route level — see step 7.
 
 ## Step 6 — Emit the YAML
 
-`write_planned_route` (`scenario/mod.rs:420`) writes the file. First
+`write_planned_route` (`scenario/mod.rs:455`) writes the file. First
 and last points are hard waypoints (start anchor and destination);
 interior points are soft (fly-by). Gated waypoints carry `gate: true`.
 A header comment notes when params were scaled.
@@ -185,7 +185,7 @@ final-approach legs it makes the boat ignore the line and cut the
 corner straight through whatever's between waypoints (in the Lundy
 case, the island itself — 13,972 land-incursion points).
 
-The follower scales the lookahead per-leg (`route/mod.rs:380` ish):
+The follower scales the lookahead per-leg (`route/mod.rs:397`):
 
     eff_lookahead = clamp(0.10 · leg_len, route.xte_lookahead, 3000)
 
