@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 360" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#cc3333"/>
+    </marker>
+    <marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1a73e8"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2e7d32"/>
+    </marker>
+  </defs>
+
+  <text x="410" y="20" text-anchor="middle" font-weight="bold" font-size="14">Step 8 — Hold gates by stemming the stream, not steering at the point</text>
+
+  <!-- LEFT PANEL: "point at the gate" orbits -->
+  <g transform="translate(20,55)">
+    <text x="180" y="0" text-anchor="middle" font-weight="bold">Steering at the gate</text>
+    <text x="180" y="18" text-anchor="middle" font-size="11" fill="#555">boat with way-on + steady current → orbits</text>
+
+    <!-- tide arrows -->
+    <g stroke="#cc3333" stroke-width="1.5" fill="none">
+      <line x1="30" y1="60" x2="80" y2="60" marker-end="url(#arrR)"/>
+      <line x1="30" y1="110" x2="80" y2="110" marker-end="url(#arrR)"/>
+      <line x1="30" y1="160" x2="80" y2="160" marker-end="url(#arrR)"/>
+      <line x1="30" y1="210" x2="80" y2="210" marker-end="url(#arrR)"/>
+    </g>
+    <text x="55" y="245" text-anchor="middle" font-size="11" fill="#cc3333">tide</text>
+
+    <!-- orbit path: an ellipse around gate -->
+    <ellipse cx="240" cy="135" rx="80" ry="50" fill="none" stroke="#1a73e8" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+    <!-- gate point -->
+    <circle cx="240" cy="135" r="6" fill="#222"/>
+    <text x="240" y="115" text-anchor="middle" font-size="11">gate point</text>
+
+    <!-- boat positions around the orbit -->
+    <g fill="#1a73e8">
+      <polygon points="320,135 314,141 314,129" transform="rotate(45 320 135)"/>
+      <polygon points="240,85 246,91 246,79" transform="rotate(135 240 85)"/>
+      <polygon points="160,135 166,129 166,141" transform="rotate(225 160 135)"/>
+      <polygon points="240,185 234,179 234,191" transform="rotate(315 240 185)"/>
+    </g>
+    <text x="240" y="232" text-anchor="middle" font-size="11" fill="#1a73e8">commanded heading = bearing to gate</text>
+    <text x="240" y="248" text-anchor="middle" font-size="10" fill="#555">overshoots, turns around, overshoots again</text>
+  </g>
+
+  <!-- vertical separator -->
+  <line x1="410" y1="55" x2="410" y2="340" stroke="#ddd"/>
+
+  <!-- RIGHT PANEL: ferry-glide -->
+  <g transform="translate(440,55)">
+    <text x="180" y="0" text-anchor="middle" font-weight="bold">Ferry-glide (stem the stream)</text>
+    <text x="180" y="18" text-anchor="middle" font-size="11" fill="#555">water velocity = −tide + small recovery → ground velocity ≈ 0</text>
+
+    <!-- tide arrows -->
+    <g stroke="#cc3333" stroke-width="1.5" fill="none">
+      <line x1="30" y1="60" x2="80" y2="60" marker-end="url(#arrR)"/>
+      <line x1="30" y1="110" x2="80" y2="110" marker-end="url(#arrR)"/>
+      <line x1="30" y1="160" x2="80" y2="160" marker-end="url(#arrR)"/>
+      <line x1="30" y1="210" x2="80" y2="210" marker-end="url(#arrR)"/>
+    </g>
+    <text x="55" y="245" text-anchor="middle" font-size="11" fill="#cc3333">tide</text>
+
+    <!-- gate point -->
+    <circle cx="240" cy="170" r="6" fill="#222"/>
+    <text x="240" y="190" text-anchor="middle" font-size="11">gate point</text>
+
+    <!-- parked boat just to one side -->
+    <polygon points="232,135 226,150 238,150" fill="#1a73e8"/>
+    <text x="226" y="130" text-anchor="end" font-size="11" fill="#222">boat</text>
+
+    <!-- water-velocity vector (heading): boat points upstream (left), opposite tide -->
+    <line x1="232" y1="142" x2="155" y2="142" stroke="#1a73e8" stroke-width="2" marker-end="url(#arrB)"/>
+    <text x="195" y="132" text-anchor="middle" font-size="11" fill="#1a73e8">water vel = −tide</text>
+
+    <!-- ground velocity ~ 0 -->
+    <line x1="232" y1="158" x2="246" y2="158" stroke="#2e7d32" stroke-width="2" marker-end="url(#arrG)"/>
+    <text x="240" y="174" font-size="11" fill="#2e7d32">ground vel ≈ 0 (parked)</text>
+
+    <text x="180" y="255" text-anchor="middle" font-size="10" fill="#555">if stem direction is upwind, snap to nearest close-hauled limit</text>
+  </g>
+</svg>
