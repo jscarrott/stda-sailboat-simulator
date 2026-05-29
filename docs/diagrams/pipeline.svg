@@ -1,4 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 660" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <style>
+    text { fill: #1f2328; }
+    @media (prefers-color-scheme: dark) {
+      text { fill: #e6edf3; }
+      [fill="#fffbe6"] { fill: #3d2e0c; }
+      [fill="#e6f4ff"] { fill: #1a2937; }
+      [fill="#fff1e6"] { fill: #3d2716; }
+      [fill="#e8f5e9"] { fill: #1c2e1e; }
+      [stroke="#333"] { stroke: #e6edf3; }
+      [fill="#333"] { fill: #e6edf3; }
+      [fill="#222"] { fill: #e6edf3; }
+      [fill="#555"] { fill: #adbac7; }
+      [fill="#666"] { fill: #adbac7; }
+      [fill="#888"] { fill: #8d96a0; }
+      [stroke="#888"] { stroke: #8d96a0; }
+      [fill="#999"] { fill: #8d96a0; }
+      [fill="#bbb"] { fill: #6e7681; }
+      [stroke="#bbb"] { stroke: #6e7681; }
+      [stroke="#ddd"] { stroke: #484f58; }
+      [fill="#996600"] { fill: #ffaa44; }
+      [fill="#1a73e8"] { fill: #58a6ff; }
+      [stroke="#1a73e8"] { stroke: #58a6ff; }
+      [stroke="#0b3d8c"] { stroke: #79b8ff; }
+      [fill="#cc3333"] { fill: #f85149; }
+      [stroke="#cc3333"] { stroke: #f85149; }
+      [fill="#cc6600"] { fill: #ff944d; }
+      [stroke="#cc6600"] { stroke: #ff944d; }
+      [fill="#2e7d32"] { fill: #56d364; }
+      [stroke="#2e7d32"] { stroke: #56d364; }
+    }
+  </style>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#333"/>

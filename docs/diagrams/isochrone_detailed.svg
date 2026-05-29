@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 580" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <style>
+    text { fill: #1f2328; }
+    @media (prefers-color-scheme: dark) {
+      text { fill: #e6edf3; }
+      [fill="#fffbe6"] { fill: #3d2e0c; }
+      [fill="#e6f4ff"] { fill: #1a2937; }
+      [fill="#fff1e6"] { fill: #3d2716; }
+      [fill="#e8f5e9"] { fill: #1c2e1e; }
+      [stroke="#333"] { stroke: #e6edf3; }
+      [fill="#333"] { fill: #e6edf3; }
+      [fill="#222"] { fill: #e6edf3; }
+      [fill="#555"] { fill: #adbac7; }
+      [fill="#666"] { fill: #adbac7; }
+      [fill="#888"] { fill: #8d96a0; }
+      [stroke="#888"] { stroke: #8d96a0; }
+      [fill="#999"] { fill: #8d96a0; }
+      [fill="#bbb"] { fill: #6e7681; }
+      [stroke="#bbb"] { stroke: #6e7681; }
+      [stroke="#ddd"] { stroke: #484f58; }
+      [fill="#996600"] { fill: #ffaa44; }
+      [fill="#1a73e8"] { fill: #58a6ff; }
+      [stroke="#1a73e8"] { stroke: #58a6ff; }
+      [stroke="#0b3d8c"] { stroke: #79b8ff; }
+      [fill="#cc3333"] { fill: #f85149; }
+      [stroke="#cc3333"] { stroke: #f85149; }
+      [fill="#cc6600"] { fill: #ff944d; }
+      [stroke="#cc6600"] { stroke: #ff944d; }
+      [fill="#2e7d32"] { fill: #56d364; }
+      [stroke="#2e7d32"] { stroke: #56d364; }
+    }
+  </style>
+  <defs>
+    <marker id="arr-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#cc6600"/>
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#cc3333"/>
+    </marker>
+  </defs>
+
+  <text x="440" y="22" text-anchor="middle" font-weight="bold" font-size="15">
+    Step 1 (detail) — Isochrone wavefronts march outward
+  </text>
+  <text x="440" y="42" text-anchor="middle" fill="#555" font-size="11">
+    Per iteration: every frontier node spawns one candidate per heading; survivors (best per cross-track bucket) form the next wavefront.
+  </text>
+
+  <!-- faint baseline from start to dest -->
+  <line x1="150" y1="320" x2="780" y2="320" stroke="#bbb" stroke-dasharray="2 4"/>
+
+  <!-- wavefronts (concentric, dashed except the final one) -->
+  <ellipse cx="165" cy="320" rx="80"  ry="60"  fill="none" stroke="#1a73e8" stroke-dasharray="3 4"/>
+  <ellipse cx="180" cy="320" rx="160" ry="120" fill="none" stroke="#1a73e8" stroke-dasharray="4 5"/>
+  <ellipse cx="195" cy="320" rx="250" ry="170" fill="none" stroke="#1a73e8" stroke-dasharray="5 6"/>
+  <ellipse cx="210" cy="320" rx="350" ry="215" fill="none" stroke="#1a73e8" stroke-dasharray="6 7"/>
+  <ellipse cx="240" cy="320" rx="540" ry="250" fill="none" stroke="#1a73e8" stroke-width="2.5"/>
+
+  <!-- wavefront labels above the topmost intersection of each -->
+  <text x="165" y="255" text-anchor="middle" fill="#1a73e8" font-size="11">t = Δt</text>
+  <text x="180" y="195" text-anchor="middle" fill="#1a73e8" font-size="11">t = 2Δt</text>
+  <text x="195" y="145" text-anchor="middle" fill="#1a73e8" font-size="11">t = 3Δt</text>
+  <text x="210" y="100" text-anchor="middle" fill="#1a73e8" font-size="11">t = 4Δt</text>
+  <text x="380" y="62"  text-anchor="middle" fill="#1a73e8" font-size="12" font-weight="bold">
+    t = 5Δt — wavefront contains dest, search terminates
+  </text>
+
+  <!-- frontier dots: a few on each wavefront to show the discrete set -->
+  <g fill="#1a73e8">
+    <!-- t=Δt ring -->
+    <circle cx="245" cy="320" r="3.5"/>
+    <circle cx="205" cy="268" r="3.5"/>
+    <circle cx="125" cy="268" r="3.5"/>
+    <circle cx="85"  cy="320" r="3.5"/>
+    <circle cx="125" cy="372" r="3.5"/>
+    <circle cx="205" cy="372" r="3.5"/>
+    <!-- t=2Δt ring -->
+    <circle cx="340" cy="320" r="3.5"/>
+    <circle cx="260" cy="217" r="3.5"/>
+    <circle cx="100" cy="217" r="3.5"/>
+    <circle cx="20"  cy="320" r="3.5"/>
+    <circle cx="100" cy="423" r="3.5"/>
+    <circle cx="260" cy="423" r="3.5"/>
+    <!-- t=3Δt -->
+    <circle cx="445" cy="320" r="3.5"/>
+    <circle cx="320" cy="172" r="3.5"/>
+    <circle cx="320" cy="468" r="3.5"/>
+    <!-- t=4Δt -->
+    <circle cx="560" cy="320" r="3.5"/>
+    <circle cx="385" cy="135" r="3.5"/>
+    <circle cx="385" cy="505" r="3.5"/>
+    <!-- t=5Δt -->
+    <circle cx="700" cy="320" r="3.5"/>
+    <circle cx="510" cy="115" r="3.5"/>
+    <circle cx="510" cy="525" r="3.5"/>
+  </g>
+
+  <!-- backtrace path: dest → parent chain → start -->
+  <path d="M 780 320 L 670 322 L 540 322 L 425 322 L 320 322 L 230 322 L 150 320"
+        fill="none" stroke="#1a73e8" stroke-width="4"/>
+  <g fill="#1a73e8" stroke="#0b3d8c" stroke-width="1">
+    <circle cx="670" cy="322" r="5"/>
+    <circle cx="540" cy="322" r="5"/>
+    <circle cx="425" cy="322" r="5"/>
+    <circle cx="320" cy="322" r="5"/>
+    <circle cx="230" cy="322" r="5"/>
+  </g>
+  <text x="465" y="350" text-anchor="middle" fill="#1a73e8" font-size="12" font-weight="bold">
+    backtrace via parent links → planned path
+  </text>
+
+  <!-- start and dest markers (drawn last so they sit on top) -->
+  <circle cx="150" cy="320" r="8" fill="#222"/>
+  <text x="150" y="378" text-anchor="middle" font-weight="bold">start</text>
+
+  <circle cx="780" cy="320" r="8" fill="#222"/>
+  <text x="780" y="378" text-anchor="middle" font-weight="bold">dest</text>
+
+  <!-- wind annotation (top-right) -->
+  <line x1="800" y1="80" x2="845" y2="125" stroke="#cc6600" stroke-width="2.5" marker-end="url(#arr-orange)"/>
+  <text x="800" y="75" fill="#cc6600" font-size="11">wind</text>
+  <text x="780" y="155" fill="#555" font-size="10">boat can't sail directly into wind</text>
+  <text x="780" y="170" fill="#555" font-size="10">→ no-go cone shapes the wavefronts</text>
+
+  <!-- tide annotation (lower-left) -->
+  <line x1="40" y1="500" x2="100" y2="490" stroke="#cc3333" stroke-width="2.5" marker-end="url(#arr-red)"/>
+  <text x="45" y="486" fill="#cc3333" font-size="11">tide drifts east →</text>
+  <text x="45" y="525" fill="#555" font-size="10">centres of successive wavefronts</text>
+  <text x="45" y="540" fill="#555" font-size="10">shift the same way (note the bias)</text>
+
+  <!-- footer -->
+  <text x="440" y="565" text-anchor="middle" fill="#555" font-size="11">
+    Wavefronts shown smooth here, but the frontier is a discrete *set* of nodes. The iteration that captures dest is the last one run.
+  </text>
+</svg>
