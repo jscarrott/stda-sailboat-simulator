@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 400" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <style>
+    text { fill: #1f2328; }
+    @media (prefers-color-scheme: dark) {
+      text { fill: #e6edf3; }
+      [fill="#fffbe6"] { fill: #3d2e0c; }
+      [fill="#e6f4ff"] { fill: #1a2937; }
+      [fill="#fff1e6"] { fill: #3d2716; }
+      [fill="#e8f5e9"] { fill: #1c2e1e; }
+      [stroke="#333"] { stroke: #e6edf3; }
+      [fill="#333"] { fill: #e6edf3; }
+      [fill="#222"] { fill: #e6edf3; }
+      [fill="#555"] { fill: #adbac7; }
+      [fill="#666"] { fill: #adbac7; }
+      [fill="#888"] { fill: #8d96a0; }
+      [stroke="#888"] { stroke: #8d96a0; }
+      [fill="#999"] { fill: #8d96a0; }
+      [fill="#bbb"] { fill: #6e7681; }
+      [stroke="#bbb"] { stroke: #6e7681; }
+      [stroke="#ddd"] { stroke: #484f58; }
+      [fill="#996600"] { fill: #ffaa44; }
+      [fill="#1a73e8"] { fill: #58a6ff; }
+      [stroke="#1a73e8"] { stroke: #58a6ff; }
+      [stroke="#0b3d8c"] { stroke: #79b8ff; }
+      [fill="#cc3333"] { fill: #f85149; }
+      [stroke="#cc3333"] { stroke: #f85149; }
+      [fill="#cc6600"] { fill: #ff944d; }
+      [stroke="#cc6600"] { stroke: #ff944d; }
+      [fill="#2e7d32"] { fill: #56d364; }
+      [stroke="#2e7d32"] { stroke: #56d364; }
+    }
+  </style>
+
+  <text x="460" y="22" text-anchor="middle" font-weight="bold" font-size="15">
+    Replanning — when a held gate doesn't open in time
+  </text>
+
+  <!-- LEFT PANEL: the original plan as loaded -->
+  <g transform="translate(0, 40)">
+    <text x="230" y="20" text-anchor="middle" font-weight="bold">Before — original plan as loaded</text>
+    <text x="230" y="38" text-anchor="middle" font-size="11" fill="#555">
+      a tidal gate at wp2 expects to open within the forecast fair window
+    </text>
+
+    <!-- planned route line -->
+    <polyline points="60,290 140,250 240,205 335,155 410,105"
+              fill="none" stroke="#1a73e8" stroke-width="2"/>
+
+    <!-- start -->
+    <circle cx="60" cy="290" r="7" fill="#222"/>
+    <text x="60" y="313" text-anchor="middle" font-size="11">start</text>
+
+    <!-- wp1 -->
+    <circle cx="140" cy="250" r="5" fill="#1a73e8"/>
+    <text x="140" y="240" text-anchor="middle" font-size="10" fill="#1a73e8">wp1</text>
+
+    <!-- wp2 (gate) -->
+    <circle cx="240" cy="205" r="5" fill="#1a73e8"/>
+    <g>
+      <line x1="240" y1="185" x2="240" y2="225" stroke="#cc6600" stroke-width="3"/>
+      <line x1="236" y1="187" x2="244" y2="187" stroke="#cc6600" stroke-width="2"/>
+      <line x1="236" y1="223" x2="244" y2="223" stroke="#cc6600" stroke-width="2"/>
+    </g>
+    <text x="252" y="208" font-size="10" fill="#cc6600">wp2 (gate)</text>
+
+    <!-- wp3 -->
+    <circle cx="335" cy="155" r="5" fill="#1a73e8"/>
+    <text x="335" y="145" text-anchor="middle" font-size="10" fill="#1a73e8">wp3</text>
+
+    <!-- dest -->
+    <circle cx="410" cy="105" r="7" fill="#222"/>
+    <text x="410" y="95" text-anchor="middle" font-size="11">dest</text>
+
+    <text x="230" y="345" text-anchor="middle" font-size="11" fill="#555" font-style="italic">
+      plan-time ETA at wp2 is well inside the forecast fair window
+    </text>
+  </g>
+
+  <!-- vertical separator -->
+  <line x1="460" y1="50" x2="460" y2="385" stroke="#ddd"/>
+
+  <!-- RIGHT PANEL: after a replan from the boat's actual position -->
+  <g transform="translate(460, 40)">
+    <text x="230" y="20" text-anchor="middle" font-weight="bold">After — replanned from the boat's actual position</text>
+    <text x="230" y="38" text-anchor="middle" font-size="11" fill="#555">
+      gate held past the wait window → fresh search from here
+    </text>
+
+    <!-- abandoned original route (faded dashed blue) -->
+    <polyline points="60,290 140,250 240,205 335,155 410,105"
+              fill="none" stroke="#1a73e8" stroke-width="1.5"
+              stroke-dasharray="4 3" opacity="0.30"/>
+    <circle cx="140" cy="250" r="4" fill="#1a73e8" opacity="0.30"/>
+    <circle cx="240" cy="205" r="4" fill="#1a73e8" opacity="0.30"/>
+    <circle cx="335" cy="155" r="4" fill="#1a73e8" opacity="0.30"/>
+
+    <!-- faded gate marker -->
+    <g opacity="0.35">
+      <line x1="240" y1="185" x2="240" y2="225" stroke="#cc6600" stroke-width="3"/>
+      <line x1="236" y1="187" x2="244" y2="187" stroke="#cc6600" stroke-width="2"/>
+      <line x1="236" y1="223" x2="244" y2="223" stroke="#cc6600" stroke-width="2"/>
+    </g>
+
+    <!-- start -->
+    <circle cx="60" cy="290" r="7" fill="#222"/>
+    <text x="60" y="313" text-anchor="middle" font-size="11">start</text>
+
+    <!-- dest -->
+    <circle cx="410" cy="105" r="7" fill="#222"/>
+    <text x="410" y="95" text-anchor="middle" font-size="11">dest</text>
+
+    <!-- boat's actual track: start → wp1 → wp2 → new_wp → dest (green) -->
+    <polyline points="60,290 140,250 240,205 290,130 410,105"
+              fill="none" stroke="#2e7d32" stroke-width="2.5"/>
+
+    <!-- new intermediate waypoint emitted by the replan -->
+    <circle cx="290" cy="130" r="5" fill="#2e7d32"/>
+    <text x="290" y="120" text-anchor="middle" font-size="10" fill="#2e7d32">new wp</text>
+
+    <!-- replan trigger marker at the gate position -->
+    <g>
+      <circle cx="240" cy="205" r="14" fill="none"
+              stroke="#cc3333" stroke-width="2" stroke-dasharray="3 2"/>
+      <text x="240" y="248" text-anchor="middle" font-size="11" fill="#cc3333" font-weight="bold">replan triggered</text>
+      <text x="240" y="262" text-anchor="middle" font-size="10" fill="#cc3333">(waited past the window)</text>
+    </g>
+
+    <text x="230" y="345" text-anchor="middle" font-size="11" fill="#555" font-style="italic">
+      green = sailed track + new plan; faded blue = abandoned remaining waypoints
+    </text>
+  </g>
+</svg>
