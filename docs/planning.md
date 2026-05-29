@@ -70,6 +70,16 @@ path.
 
 ![Isochrone wavefronts over multiple iterations](diagrams/isochrone_detailed.svg)
 
+Another way to look at the same thing: pretend you painted every point in
+the surrounding sea with the minimum time it'd take the boat to get
+there. You'd get a heat map. Dark = fast (downwind, with the tide); bright
+= slow (upwind, where the boat has to tack); the wedge into the wind is
+the no-go cone, and the whole map leans in the direction the tide is
+setting. The isochrones (the wavefronts above) are just the
+constant-time contour lines of this heat map.
+
+![Isochrone heat map — minimum time to reach, with isochrone contours](diagrams/isochrone_heatmap.png)
+
 ## Cleaning up the path: tack apexes only
 
 The raw search puts a point every Δt — far too many to feed the
@@ -152,6 +162,27 @@ per-leg where appropriate.
 
 ![Per-leg adaptive cross-track lookahead: loose on long legs, tight on short](diagrams/per_leg_xte.svg)
 
+## Crabbing into the tide (opt-in)
+
+Tracking the line and *not getting set sideways in the first place* are
+different things. With `--crab` enabled, when the follower is steering
+directly at the next waypoint (not tacking, not holding at a gate), it
+offsets the commanded heading by a *crab angle* so the boat's
+through-water motion plus the tidal set lands the ground track on the
+rhumb line. Geometrically: aim slightly upstream of where you want to
+go, so the tide carries you sideways onto your line.
+
+It's deliberately off by default. The crab angle is a kinematic
+solution that doesn't know about the polar — on a marginally powered
+boat in a strong cross-set, demanding more crab puts the heading too
+close to the wind, which slows the boat, which makes the apparent crab
+angle even larger. The follower's cross-track-error term already keeps
+moderate set in check over time, so crab is the right call mostly when
+the cross-set is large compared to boat speed and you'd rather pay the
+upwind cost than let it wash you off track. Crab is also skipped
+during gate holds, since the ferry-glide heading is already a
+water-frame command and applying crab on top would double-compensate.
+
 ## Holding station: ferry-glide, don't orbit
 
 At a held gate the obvious thing is to "steer at the waypoint." This
@@ -199,6 +230,7 @@ User-facing knobs (CLI flags or route-file fields):
 |---|---|
 | `--polar-derate` | Scales the planner's speed model. Lower = more conservative ETAs and longer detours to avoid foul tide. |
 | `--plan-tidal-gates` | Turn gate placement on or off entirely. |
+| `--crab` | Aim slightly into the tide so the ground track stays on the rhumb line (off by default; see "Crabbing into the tide" above). |
 | `xte_lookahead` (route) | The floor for the follower's line-tracking aggressiveness. The follower opens it up per-leg but never tightens below this. |
 | `min_tack_duration_s` (route) | The floor for how long the boat commits to a tack. The planner raises it on long legs. |
 | `gate_open_along_current` (route) | How fair the tide must be before a held gate opens. |
