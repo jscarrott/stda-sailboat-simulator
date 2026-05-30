@@ -26,5 +26,11 @@ serialport = { version = "4", optional = true }
 [features]
 hil = ["dep:serialport"]
 
+# Shore-station LoRa tool: needs the serial link, so it rides the `hil` feature.
+[[bin]]
+name = "shore"
+path = "src/bin/shore.rs"
+required-features = ["hil"]
+
 [dev-dependencies]
 serde_json = "1"

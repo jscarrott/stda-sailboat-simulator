@@ -122,6 +122,31 @@ cargo build --release --features lora
 cargo build --release --features "display lora"   # both options together
 ```
 
+### Shore station: bridge + host tool
+
+To actually see positions and send waypoints you need a second radio at the
+shore. Flash a **second nRF52840-DK** with the **`bridge`** role — same firmware,
+it relays USB serial ⇄ LoRa instead of running the controller — and drive it
+with the host `shore` tool:
+
+```text
+ boat DK (--features lora) ⇄ LoRa ⇄ shore DK (--features bridge) ⇄ USB ⇄ `shore` tool
+```
+
+```bash
+# shore-station DK (relay; no controller):
+cargo build --release --features bridge
+cargo run   --release --features bridge        # flash + run
+
+# host tool (in rust_src/, needs the `hil` feature for serial):
+cargo run --features hil --bin shore -- --port /dev/ttyACM0 --waypoint 800,950
+#   prints PositionReports as they arrive; type more "X,Y" lines to send waypoints.
+cargo run --features hil --bin shore -- --loopback   # offline self-test, no hardware
+```
+
+When the boat receives a waypoint it steers to that bearing instead of the
+host's commanded heading (visible in the `--scenario hil` trace).
+
 > Note: the LoRa path builds for the target but has not been exercised on real
 > RF hardware here. The `radio.rs` SX1262 setup follows the `lora-phy` API; if
 > your `lora-phy` minor version differs, the radio calls may need small tweaks.
