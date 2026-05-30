@@ -1,96 +1,35 @@
+//! Host-side adapter over the shared [`boat_control`] controller.
+//!
+//! The control logic itself now lives in the `boat-control` crate (generic over
+//! the float type, `no_std`, so it also runs on the nRF52840 firmware). The
+//! simulator uses the `f64` instantiation — that keeps the bit-exact
+//! Python-trace test below passing — and this module just supplies the
+//! `Config`-derived constructor the rest of the simulator already calls.
+
 use std::f64::consts::PI;
 
 use crate::config::Config;
-use crate::physics::util::sign;
 
-/// PID heading controller with anti-windup and low-speed gain shaping.
-/// Port of `heading_controller.py:17`.
+/// The simulator's heading controller: the shared generic controller pinned to
+/// `f64`. Autopilots store this type directly.
+pub type HeadingController = boat_control::HeadingController<f64>;
+
+/// Build a [`HeadingController`] from the boat/environment config.
 ///
-/// Default gains (0.5, 0.1, 0.9) are the ones Python actually runs
-/// with. They are close to but not identical to the LQR-derived values
-/// — re-derive via `scripts/compute_lqr_gains.py` if `Q`, `r`, or
-/// `yaw_timeconstant` change. The LQR design inputs are
-/// `Q = diag([0.1, 1, 0.3])` and `r = 30`; see the script for the
-/// 3-state linearisation `[heading_error, yaw_rate, integrated_error]`.
-pub struct HeadingController {
-    pub sample_time: f64,
-    pub speed_adaption: f64,
-    pub max_rudder_angle: f64,
-    pub factor: f64,
-    pub kp: f64,
-    pub ki: f64,
-    pub kd: f64,
-    summed_error: f64,
-}
-
-impl HeadingController {
-    pub fn new(cfg: &Config, sample_time: f64) -> Self {
-        let b = &cfg.boat;
-        let e = &cfg.environment;
-        let factor = b.distance_cog_rudder * b.rudder.area * PI * e.water_density / b.moi_z;
-        // Prefer LQR-derived gains from the YAML; fall back to the 4 m
-        // hull's hand-tuned values (these match what
-        // heading_controller.py:33-35 actually runs with, which the
-        // Python-trace test depends on).
-        let (kp, ki, kd) = match cfg.controller_gains {
-            Some(g) => (g.kp, g.ki, g.kd),
-            None => (0.5, 0.1, 0.9),
-        };
-        Self {
-            sample_time,
-            speed_adaption: 0.3,
-            max_rudder_angle: 15.0_f64.to_radians(),
-            factor,
-            kp,
-            ki,
-            kd,
-            summed_error: 0.0,
-        }
-    }
-
-    /// Port of `heading_controller.controll()`.
-    pub fn control(
-        &mut self,
-        desired_heading: f64,
-        heading: f64,
-        yaw_rate: f64,
-        speed: f64,
-        roll: f64,
-        drift_angle: f64,
-    ) -> f64 {
-        let mut heading_error = desired_heading - heading;
-        while heading_error > PI {
-            heading_error -= 2.0 * PI;
-        }
-        while heading_error < -PI {
-            heading_error += 2.0 * PI;
-        }
-
-        self.summed_error += self.sample_time * (heading_error - drift_angle);
-
-        let effective_speed = if speed < self.speed_adaption {
-            self.speed_adaption
-        } else {
-            speed
-        };
-        let factor2 = -1.0 / self.factor / (effective_speed * effective_speed) / roll.cos();
-
-        let mut rudder_angle =
-            factor2 * (self.kp * heading_error + self.ki * self.summed_error - self.kd * yaw_rate);
-
-        if rudder_angle.abs() > self.max_rudder_angle {
-            rudder_angle = sign(rudder_angle) * self.max_rudder_angle;
-            // Anti-windup: back-calculate the integrator so it doesn't
-            // wind past saturation. Mirrors heading_controller.py:122.
-            self.summed_error = (rudder_angle / factor2 - (self.kp * heading_error - self.kd * yaw_rate)) / self.ki;
-        }
-
-        rudder_angle
-    }
-
-    pub fn reset(&mut self) {
-        self.summed_error = 0.0;
-    }
+/// Computes `factor = distance_cog_rudder · rudder_area · π · water_density /
+/// moi_z` and prefers LQR-derived gains from the YAML, falling back to the 4 m
+/// hull's hand-tuned values `(0.5, 0.1, 0.9)` (which match what
+/// `heading_controller.py:33-35` runs with — the Python-trace test depends on
+/// it). `±15°` rudder limit, `0.3 m/s` low-speed clamp.
+pub fn new_from_config(cfg: &Config, sample_time: f64) -> HeadingController {
+    let b = &cfg.boat;
+    let e = &cfg.environment;
+    let factor = b.distance_cog_rudder * b.rudder.area * PI * e.water_density / b.moi_z;
+    let (kp, ki, kd) = match cfg.controller_gains {
+        Some(g) => (g.kp, g.ki, g.kd),
+        None => (0.5, 0.1, 0.9),
+    };
+    HeadingController::from_params(factor, kp, ki, kd, sample_time, 0.3, 15.0_f64.to_radians())
 }
 
 #[cfg(test)]
@@ -133,7 +72,7 @@ mod tests {
             .expect("run scripts/dump_fixtures.py first");
         let file: TracesFile = serde_json::from_str(&raw).unwrap();
         for trace in &file.traces {
-            let mut ctrl = HeadingController::new(&cfg, trace.sample_time);
+            let mut ctrl = new_from_config(&cfg, trace.sample_time);
             for (i, (input, &expected)) in trace.inputs.iter().zip(trace.outputs.iter()).enumerate() {
                 let got = ctrl.control(
                     input.desired_heading,

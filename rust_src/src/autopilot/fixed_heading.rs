@@ -6,7 +6,7 @@
 
 use crate::autopilot::{Autopilot, Command, Observation};
 use crate::config::Config;
-use crate::controller::HeadingController;
+use crate::controller::{new_from_config, HeadingController};
 use crate::physics::wind::{calculate_apparent_wind, TrueWind};
 use crate::sail::sail_angle;
 
@@ -21,7 +21,7 @@ impl FixedHeadingAutopilot {
     pub fn new(cfg: &Config, target_heading: f64, control_period_s: f64) -> Self {
         Self {
             target_heading,
-            heading_controller: HeadingController::new(cfg, control_period_s),
+            heading_controller: new_from_config(cfg, control_period_s),
             sail_stretching: cfg.boat.sail.stretching,
             last_sail_mag: 0.0,
         }

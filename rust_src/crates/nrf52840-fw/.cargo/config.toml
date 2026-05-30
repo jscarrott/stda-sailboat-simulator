@@ -1,0 +1,14 @@
+# Build for the nRF52840 (Cortex-M4F) by default, and flash/run with probe-rs.
+[build]
+target = "thumbv7em-none-eabihf"
+
+[target.thumbv7em-none-eabihf]
+runner = "probe-rs run --chip nRF52840_xxAA"
+rustflags = [
+  "-C", "link-arg=--nmagic",
+  "-C", "link-arg=-Tlink.x",
+  "-C", "link-arg=-Tdefmt.x",
+]
+
+[env]
+DEFMT_LOG = "info"
