@@ -81,3 +81,54 @@ never blocks the controller — init and draw errors are ignored.
 cargo build --release --features display
 cargo run   --release --features display    # flash + run with a probe attached
 ```
+
+## Optional LoRa supervisory link
+
+Build with `--features lora` to add a long-range, low-rate channel for **tracking
+the boat's position** and **sending it new waypoints** — separate from the fast
+USB control loop. The controller stays onboard; LoRa only carries *where it is*
+and *where to go*, which is well within LoRa's bandwidth and duty-cycle limits.
+
+- **Boat → shore:** a `PositionReport` (x, y, heading, speed) every ~10 s.
+- **Shore → boat:** a `WaypointCmd` (x, y); on receipt the controller steers to
+  the bearing of that waypoint instead of the host's commanded heading.
+
+Point-to-point (no LoRaWAN): a matching SX1262 radio at the shore station. Each
+LoRa packet carries one bare postcard message (no COBS — a LoRa frame is already
+delimited and CRC-checked). Defaults: SF10/125 kHz, **868.1 MHz (EU)**, 14 dBm —
+change the frequency in `radio.rs` to a 915 MHz channel for US/Canada.
+
+### Recommended radio + wiring (nRF52840-DK)
+
+- **Module:** a Semtech **SX1262** breakout, e.g. **Waveshare Core1262-HF**
+  (868/915 MHz) or **EBYTE E22-900M22S**. Pick the 868 MHz (EU) or 915 MHz (US)
+  variant for your region. (Driver: `lora-phy`, which supports the SX1262.)
+- **Bus:** SPI3 (kept off the I2C instance the OLED uses). Default DK Arduino-header pins:
+
+  | Signal | nRF pin | Arduino |
+  |--------|---------|---------|
+  | SCK    | P1.15   | D13     |
+  | MISO   | P1.14   | D12     |
+  | MOSI   | P1.13   | D11     |
+  | NSS    | P1.12   | D10     |
+  | RESET  | P1.11   | D9      |
+  | BUSY   | P1.10   | D8      |
+  | DIO1   | P1.08   | D7      |
+
+  Plus 3V3 + GND, and an antenna for your band. Adjust pins in `radio.rs`.
+
+```bash
+cargo build --release --features lora
+cargo build --release --features "display lora"   # both options together
+```
+
+> Note: the LoRa path builds for the target but has not been exercised on real
+> RF hardware here. The `radio.rs` SX1262 setup follows the `lora-phy` API; if
+> your `lora-phy` minor version differs, the radio calls may need small tweaks.
+
+## Recommended screen
+
+A **0.96" 128×64 SSD1306 I2C OLED** (e.g. Adafruit #326, or a generic
+HiLetgo/AZ-Delivery SSD1306 module). Make sure it's a genuine **SSD1306** (some
+1.3" modules are SH1106, which needs a different driver). Wire SDA→P0.26,
+SCL→P0.27, VCC→3V3, GND→GND on the DK; build with `--features display`.

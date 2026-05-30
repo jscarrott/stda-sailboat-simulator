@@ -34,9 +34,17 @@ embedded-graphics = { version = "0.8", optional = true }
 ssd1306 = { version = "0.9", optional = true }
 heapless = { version = "0.8", optional = true }
 
+# Optional SX1262 LoRa supervisory link (position telemetry + waypoint commands).
+lora-phy = { version = "3", optional = true }
+embedded-hal-bus = { version = "0.2", features = ["async"], optional = true }
+embassy-sync = { version = "0.6", optional = true }
+
 [features]
 # Drive an SSD1306 OLED over I2C showing the live controller output and sensors.
 display = ["dep:embedded-graphics", "dep:ssd1306", "dep:heapless"]
+# Long-range supervisory link: report position and accept new waypoints over a
+# Semtech SX1262 LoRa radio (SPI).
+lora = ["dep:lora-phy", "dep:embedded-hal-bus", "dep:embassy-sync"]
 
 # Small, debuggable firmware: optimise so the USB stack fits comfortably and
 # timing is realistic, but keep symbols for probe-rs/defmt.

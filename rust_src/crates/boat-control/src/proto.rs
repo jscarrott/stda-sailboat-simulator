@@ -47,6 +47,11 @@ pub struct SensorPacket {
     pub vel_y_body: f32,
     pub true_wind_dir: f32,
     pub true_wind_speed: f32,
+    /// Global position (m). On a real boat this comes from GPS; in the sim it's
+    /// the state vector. Used for LoRa position telemetry and for steering
+    /// toward a LoRa-delivered waypoint.
+    pub pos_x: f32,
+    pub pos_y: f32,
 }
 
 /// Device → host reply: the actuator commands for this tick.
@@ -61,6 +66,44 @@ pub struct CommandPacket {
 pub enum HostMsg {
     Config(ConfigPacket),
     Sensor(SensorPacket),
+}
+
+// --- Remote supervisory link (LoRa) -----------------------------------------
+//
+// These ride the slow, long-range link, not the fast onboard USB loop. They are
+// sent one message per LoRa packet (no COBS framing — a LoRa frame is already a
+// delimited, CRC-checked unit), so encode/decode them with the plain
+// `to_slice`/`from_bytes` helpers below.
+
+/// Boat → shore: periodic position/heading/speed for tracking.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+pub struct PositionReport {
+    pub pos_x: f32,
+    pub pos_y: f32,
+    pub heading: f32,
+    pub speed: f32,
+}
+
+/// Shore → boat: a new target waypoint (global frame, m). The onboard
+/// controller steers toward it.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+pub struct WaypointCmd {
+    pub x: f32,
+    pub y: f32,
+}
+
+/// Encode `msg` as a bare (un-framed) postcard message — one message per LoRa
+/// packet. Returns the written slice.
+pub fn encode_unframed<'a, T: Serialize>(
+    msg: &T,
+    buf: &'a mut [u8],
+) -> Result<&'a mut [u8], postcard::Error> {
+    postcard::to_slice(msg, buf)
+}
+
+/// Decode a bare (un-framed) postcard message, e.g. a received LoRa packet.
+pub fn decode_unframed<T: for<'de> Deserialize<'de>>(buf: &[u8]) -> Result<T, postcard::Error> {
+    postcard::from_bytes(buf)
 }
 
 /// Encode `msg` into `buf` as a COBS-framed postcard message, returning the
@@ -109,6 +152,8 @@ mod tests {
             vel_y_body: 0.1,
             true_wind_dir: 0.785,
             true_wind_speed: 5.0,
+            pos_x: 1234.5,
+            pos_y: -678.9,
         });
         let mut buf2 = [0u8; MAX_FRAME];
         let n2 = encode(&sensor, &mut buf2).unwrap().len();
@@ -123,5 +168,23 @@ mod tests {
         let n = encode(&cmd, &mut buf).unwrap().len();
         let got: CommandPacket = decode(&mut buf[..n]).unwrap();
         assert_eq!(got, cmd);
+    }
+
+    #[test]
+    fn lora_messages_round_trip_unframed() {
+        // Position report (boat → shore).
+        let mut buf = [0u8; MAX_FRAME];
+        let report = PositionReport { pos_x: 1500.0, pos_y: -200.0, heading: 1.57, speed: 1.4 };
+        let n = encode_unframed(&report, &mut buf).unwrap().len();
+        // A LoRa-suitable payload: well under any spreading-factor limit.
+        assert!(n <= 20, "position report should be tiny, got {n} bytes");
+        let got: PositionReport = decode_unframed(&buf[..n]).unwrap();
+        assert_eq!(got, report);
+
+        // Waypoint command (shore → boat).
+        let wp = WaypointCmd { x: 800.0, y: 950.0 };
+        let n = encode_unframed(&wp, &mut buf).unwrap().len();
+        let got: WaypointCmd = decode_unframed(&buf[..n]).unwrap();
+        assert_eq!(got, wp);
     }
 }
