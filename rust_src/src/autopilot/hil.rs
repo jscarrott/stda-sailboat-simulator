@@ -115,6 +115,8 @@ impl Autopilot for HilAutopilot {
             vel_y_body: obs.vel_y_body as f32,
             true_wind_dir: obs.true_wind.direction as f32,
             true_wind_speed: obs.true_wind.speed as f32,
+            pos_x: obs.pos_x as f32,
+            pos_y: obs.pos_y as f32,
         });
         // A dropped frame mid-run is unrecoverable for the sim, so surface it
         // as a panic rather than silently freezing the actuators.

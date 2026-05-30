@@ -16,28 +16,51 @@
 
 use defmt::{info, warn};
 use embassy_executor::Spawner;
+#[cfg(not(feature = "lora"))]
 use embassy_futures::join::join;
+#[cfg(feature = "lora")]
+use embassy_futures::join::join3;
 use embassy_nrf::usb::vbus_detect::HardwareVbusDetect;
 use embassy_nrf::usb::Driver;
-use embassy_nrf::{bind_interrupts, peripherals, twim, usb};
+use embassy_nrf::{bind_interrupts, peripherals, spim, twim, usb};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::driver::EndpointError;
 use embassy_usb::{Builder, Config};
 use {defmt_rtt as _, panic_probe as _};
 
-use boat_control::proto::{self, CommandPacket, ConfigPacket, HostMsg, SensorPacket, MAX_FRAME};
+use boat_control::proto::{
+    self, CommandPacket, ConfigPacket, HostMsg, SensorPacket, WaypointCmd, MAX_FRAME,
+};
 use boat_control::{apparent_wind, sail_angle, HeadingController};
 use num_traits::Float;
 
 mod display;
 use display::Screen;
 
+#[cfg(feature = "lora")]
+mod radio;
+
+// Channels between the fast control loop and the slow LoRa task. The control
+// loop publishes the latest position; the LoRa task publishes received
+// waypoints. `Signal` coalesces to the most recent value, which is exactly what
+// a periodic telemetry/command link wants.
+#[cfg(feature = "lora")]
+use boat_control::proto::PositionReport;
+#[cfg(feature = "lora")]
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+#[cfg(feature = "lora")]
+static POSITION: Signal<CriticalSectionRawMutex, PositionReport> = Signal::new();
+#[cfg(feature = "lora")]
+static WAYPOINT: Signal<CriticalSectionRawMutex, WaypointCmd> = Signal::new();
+
 bind_interrupts!(struct Irqs {
     USBD => usb::InterruptHandler<peripherals::USBD>;
     POWER_CLOCK => usb::vbus_detect::InterruptHandler;
-    // I2C for the optional OLED status screen (also bound when the `display`
-    // feature is off — the peripheral is simply never enabled then).
+    // I2C for the optional OLED status screen, SPI for the optional LoRa radio.
+    // Both are bound even when their feature is off — the peripheral is simply
+    // never enabled then.
     SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0 => twim::InterruptHandler<peripherals::TWISPI0>;
+    SPIM3 => spim::InterruptHandler<peripherals::SPI3>;
 });
 
 /// Holds the controller state between sensor ticks. `None` until the host's
@@ -66,7 +89,16 @@ impl Autopilot {
     }
 
     /// One control tick — the f32 twin of `FixedHeadingAutopilot::step`.
-    fn step(&mut self, s: &SensorPacket) -> CommandPacket {
+    ///
+    /// When `waypoint` is set (delivered over LoRa) the target heading is the
+    /// bearing from the current position to the waypoint; otherwise the host's
+    /// commanded heading is used.
+    fn step(&mut self, s: &SensorPacket, waypoint: Option<WaypointCmd>) -> CommandPacket {
+        let target_heading = match waypoint {
+            Some(wp) => (wp.y - s.pos_y).atan2(wp.x - s.pos_x),
+            None => s.target_heading,
+        };
+
         let (app_angle, app_speed) = apparent_wind(
             s.heading,
             s.vel_x_body,
@@ -81,7 +113,7 @@ impl Autopilot {
         let speed = (s.vel_x_body * s.vel_x_body + s.vel_y_body * s.vel_y_body).sqrt();
         let drift = s.vel_y_body.atan2(s.vel_x_body);
         let rudder = self.controller.control(
-            s.target_heading,
+            target_heading,
             s.heading,
             s.yaw_rate,
             speed,
@@ -161,6 +193,17 @@ async fn main(_spawner: Spawner) {
         }
     };
 
+    // Optional SX1262 LoRa supervisory link on SPI3. Default DK Arduino-header
+    // pins: SCK=P1.15(D13) MISO=P1.14(D12) MOSI=P1.13(D11) NSS=P1.12(D10)
+    // RESET=P1.11(D9) BUSY=P1.10(D8) DIO1=P1.08(D7). See radio.rs.
+    #[cfg(feature = "lora")]
+    {
+        let lora_fut = radio::run(
+            p.SPI3, p.P1_15, p.P1_14, p.P1_13, p.P1_12, p.P1_11, p.P1_10, p.P1_08,
+        );
+        join3(usb_fut, control_fut, lora_fut).await;
+    }
+    #[cfg(not(feature = "lora"))]
     join(usb_fut, control_fut).await;
 }
 
@@ -185,6 +228,10 @@ async fn control_loop<'d, D: embassy_usb::driver::Driver<'d>>(
     let mut rx: heapless_acc::FrameAcc = heapless_acc::FrameAcc::new();
     let mut packet = [0u8; 64];
     let mut tx = [0u8; MAX_FRAME];
+    // Latest waypoint delivered over LoRa (latched across ticks). Always `None`
+    // without the `lora` feature.
+    #[allow(unused_mut)]
+    let mut waypoint: Option<WaypointCmd> = None;
 
     loop {
         let n = class.read_packet(&mut packet).await?;
@@ -197,12 +244,33 @@ async fn control_loop<'d, D: embassy_usb::driver::Driver<'d>>(
                     info!("configured");
                 }
                 Ok(HostMsg::Sensor(sensor)) => {
+                    // Pick up a waypoint the LoRa task may have received.
+                    #[cfg(feature = "lora")]
+                    if let Some(wp) = WAYPOINT.try_take() {
+                        info!("steering to LoRa waypoint");
+                        waypoint = Some(wp);
+                    }
+
                     if let Some(ap) = autopilot.as_mut() {
-                        let cmd = ap.step(&sensor);
+                        let cmd = ap.step(&sensor, waypoint);
                         if let Ok(out) = proto::encode(&cmd, &mut tx) {
                             class.write_packet(out).await?;
                         }
                         screen.show(&sensor, &cmd);
+
+                        // Publish position for the LoRa telemetry task.
+                        #[cfg(feature = "lora")]
+                        {
+                            let speed = (sensor.vel_x_body * sensor.vel_x_body
+                                + sensor.vel_y_body * sensor.vel_y_body)
+                                .sqrt();
+                            POSITION.signal(PositionReport {
+                                pos_x: sensor.pos_x,
+                                pos_y: sensor.pos_y,
+                                heading: sensor.heading,
+                                speed,
+                            });
+                        }
                     } else {
                         warn!("sensor before config; ignoring");
                     }
