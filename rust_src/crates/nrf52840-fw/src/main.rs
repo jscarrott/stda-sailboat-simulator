@@ -19,7 +19,7 @@ use embassy_executor::Spawner;
 use embassy_futures::join::join;
 use embassy_nrf::usb::vbus_detect::HardwareVbusDetect;
 use embassy_nrf::usb::Driver;
-use embassy_nrf::{bind_interrupts, peripherals, usb};
+use embassy_nrf::{bind_interrupts, peripherals, twim, usb};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::driver::EndpointError;
 use embassy_usb::{Builder, Config};
@@ -29,9 +29,15 @@ use boat_control::proto::{self, CommandPacket, ConfigPacket, HostMsg, SensorPack
 use boat_control::{apparent_wind, sail_angle, HeadingController};
 use num_traits::Float;
 
+mod display;
+use display::Screen;
+
 bind_interrupts!(struct Irqs {
     USBD => usb::InterruptHandler<peripherals::USBD>;
     POWER_CLOCK => usb::vbus_detect::InterruptHandler;
+    // I2C for the optional OLED status screen (also bound when the `display`
+    // feature is off — the peripheral is simply never enabled then).
+    SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0 => twim::InterruptHandler<peripherals::TWISPI0>;
 });
 
 /// Holds the controller state between sensor ticks. `None` until the host's
@@ -122,6 +128,26 @@ async fn main(_spawner: Spawner) {
     let mut class = CdcAcmClass::new(&mut builder, &mut state, 64);
     let mut usb = builder.build();
 
+    // Optional OLED status screen on TWISPI0 (I2C). Default pins: P0.26 = SDA,
+    // P0.27 = SCL (nRF52840-DK Arduino header / common breakout wiring); change
+    // to suit your board. Without `--features display` this is a no-op `()`.
+    #[cfg(feature = "display")]
+    let mut screen = {
+        let mut tcfg = twim::Config::default();
+        tcfg.frequency = twim::Frequency::K400;
+        let twi = twim::Twim::new(p.TWISPI0, Irqs, p.P0_26, p.P0_27, tcfg);
+        let iface = ssd1306::I2CDisplayInterface::new(twi);
+        let disp = ssd1306::Ssd1306::new(
+            iface,
+            ssd1306::size::DisplaySize128x64,
+            ssd1306::rotation::DisplayRotation::Rotate0,
+        )
+        .into_buffered_graphics_mode();
+        display::OledScreen::new(disp)
+    };
+    #[cfg(not(feature = "display"))]
+    let mut screen = ();
+
     let usb_fut = usb.run();
 
     let control_fut = async {
@@ -129,7 +155,7 @@ async fn main(_spawner: Spawner) {
         loop {
             class.wait_connection().await;
             info!("host connected");
-            if control_loop(&mut class, &mut autopilot).await.is_err() {
+            if control_loop(&mut class, &mut autopilot, &mut screen).await.is_err() {
                 warn!("host disconnected");
             }
         }
@@ -153,6 +179,7 @@ impl From<EndpointError> for Disconnected {
 async fn control_loop<'d, D: embassy_usb::driver::Driver<'d>>(
     class: &mut CdcAcmClass<'d, D>,
     autopilot: &mut Option<Autopilot>,
+    screen: &mut impl Screen,
 ) -> Result<(), Disconnected> {
     // RX accumulator: bytes up to a `0x00` COBS delimiter form one frame.
     let mut rx: heapless_acc::FrameAcc = heapless_acc::FrameAcc::new();
@@ -175,6 +202,7 @@ async fn control_loop<'d, D: embassy_usb::driver::Driver<'d>>(
                         if let Ok(out) = proto::encode(&cmd, &mut tx) {
                             class.write_packet(out).await?;
                         }
+                        screen.show(&sensor, &cmd);
                     } else {
                         warn!("sensor before config; ignoring");
                     }
