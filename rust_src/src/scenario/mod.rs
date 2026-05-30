@@ -285,6 +285,49 @@ pub fn scenario_polar(
     Ok(polar)
 }
 
+/// Hardware-in-the-loop run: hold a heading (set by `twa_deg` off a constant
+/// wind) for `run_time` seconds, but compute the rudder/sail commands on an
+/// nRF52840 reached over USB serial at `port` instead of in-process. Returns the
+/// trajectory (same `SimResult` as the in-process `polar` point) plus the held
+/// heading, so the caller can report speed and compare against a local run.
+#[cfg(feature = "hil")]
+pub fn scenario_hil(
+    cfg: &Config,
+    wind_speed: f64,
+    twa_deg: f64,
+    run_time: f64,
+    solver: Solver,
+    port: &str,
+) -> Result<(SimResult, f64)> {
+    use crate::autopilot::HilAutopilot;
+    use crate::physics::wind::TrueWind;
+    use crate::state::{VEL_X, YAW};
+    use crate::wind_model::ConstantWind;
+    use std::f64::consts::PI;
+
+    let inv = Invariants::from_config(cfg);
+    let wind_from = 1.5 * PI; // wind blows toward +y (north), comes from the south
+    let true_wind = TrueWind { x: 0.0, y: wind_speed, strength: wind_speed, direction: 90.0 };
+    let heading = wind_from - twa_deg.to_radians(); // starboard tack
+
+    let mut env = Environment::from_config(cfg);
+    env.true_wind = true_wind;
+
+    let mut ap = HilAutopilot::new(cfg, heading, SAMPLE_TIME, port)?;
+    let mut wind = ConstantWind::new(true_wind);
+    let mut current = NoCurrent;
+    let mut x0 = initial_state(cfg, true);
+    x0[YAW] = heading;
+    x0[VEL_X] = 0.3;
+
+    let n_steps = (run_time / SAMPLE_TIME) as usize;
+    let result = simulate(
+        cfg, &inv, env, &mut ap, &mut wind, &mut current,
+        SAMPLE_TIME, n_steps, x0, true, solver,
+    )?;
+    Ok((result, heading))
+}
+
 /// Build a `TideForecast` for planning from the analytic tide params or
 /// a tabulated cache (matching how `scenario_route` builds its current).
 fn build_forecast(tide: Option<TidalParams>, tide_data: Option<&Path>) -> Result<TideForecast> {

@@ -1,3 +1,9 @@
+[workspace]
+members = [".", "crates/boat-control"]
+# nrf52840-fw is embedded-only (#![no_main], thumbv7em-none-eabihf); it is built
+# explicitly for its target and must not be pulled into the host workspace build.
+exclude = ["crates/nrf52840-fw"]
+
 [package]
 name = "sailboat_sim"
 version = "0.1.0"
@@ -12,6 +18,13 @@ plotters = "0.3"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 serde_json = "1"
+boat-control = { path = "crates/boat-control", default-features = false, features = ["std"] }
+# Host-side serial link for the hardware-in-the-loop autopilot. Optional so the
+# default build needs no system serial libraries (libudev on Linux).
+serialport = { version = "4", optional = true }
+
+[features]
+hil = ["dep:serialport"]
 
 [dev-dependencies]
 serde_json = "1"

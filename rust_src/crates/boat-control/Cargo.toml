@@ -1,0 +1,18 @@
+[package]
+name = "boat-control"
+version = "0.1.0"
+edition = "2021"
+description = "no_std, float-generic sailboat heading + sail trim control logic (shared by the simulator and nRF52840 firmware)"
+license = "MIT"
+
+[dependencies]
+num-traits = { version = "0.2", default-features = false }
+serde = { version = "1", default-features = false, features = ["derive"] }
+postcard = "1"
+
+[features]
+default = ["libm"]
+# Host build: use the system libm via std and pull in serde's std impls.
+std = ["num-traits/std", "serde/std", "postcard/use-std"]
+# Embedded build: pure no_std math through the `libm` crate.
+libm = ["num-traits/libm"]

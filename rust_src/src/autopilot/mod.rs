@@ -7,9 +7,13 @@
 //! real servos. Neither side knows which the other is.
 
 pub mod fixed_heading;
+#[cfg(feature = "hil")]
+pub mod hil;
 pub mod route;
 
 pub use fixed_heading::FixedHeadingAutopilot;
+#[cfg(feature = "hil")]
+pub use hil::HilAutopilot;
 pub use route::{Obstacle, ReplanContext, RouteAutopilot};
 
 /// World-frame wind sensed by the boat.

@@ -165,6 +165,17 @@ struct Cli {
     /// scripts/scale_hull.py.
     #[arg(long, value_delimiter = ',')]
     fleet_configs: Vec<PathBuf>,
+
+    /// `--scenario hil`: serial port of the nRF52840 running the controller
+    /// firmware (e.g. /dev/ttyACM0). The host streams simulated sensors to the
+    /// device and applies the rudder/sail commands it replies with. Requires a
+    /// build with `--features hil`.
+    #[arg(long, default_value = "/dev/ttyACM0")]
+    hil_port: String,
+
+    /// `--scenario hil`: true wind angle (deg) to hold during the run.
+    #[arg(long, default_value_t = 90.0)]
+    hil_twa_deg: f64,
 }
 
 fn main() -> Result<()> {
@@ -399,9 +410,75 @@ fn main() -> Result<()> {
             )?;
             println!("wrote {}", html_out.display());
         }
-        other => bail!("unknown scenario {other:?}; supported: route, polar, plan, fleet"),
+        "hil" => {
+            #[cfg(feature = "hil")]
+            {
+                let wind_speed = cli.wind_speed.unwrap_or(4.0);
+                let solver = match cli.solver.as_str() {
+                    "dopri5" => Solver::Dopri5,
+                    "rk4" => Solver::Rk4,
+                    other => bail!("unknown --solver {other:?}; supported: dopri5, rk4"),
+                };
+                let run_time = cli.max_run_time_s.min(120.0);
+                println!(
+                    "HIL: holding TWA {:.0}° in {:.1} m/s wind via controller on {} for {:.0} s",
+                    cli.hil_twa_deg, wind_speed, cli.hil_port, run_time
+                );
+                let (result, heading) = scenario::scenario_hil(
+                    &cfg, wind_speed, cli.hil_twa_deg, run_time, solver, &cli.hil_port,
+                )?;
+                report_hil_run(&result, heading);
+            }
+            #[cfg(not(feature = "hil"))]
+            {
+                let _ = (&cli.hil_port, cli.hil_twa_deg);
+                bail!("the `hil` scenario needs the serial link; rebuild with `cargo run --features hil -- --scenario hil ...`");
+            }
+        }
+        other => bail!("unknown scenario {other:?}; supported: route, polar, plan, fleet, hil"),
     }
     Ok(())
+}
+
+/// Summarise a hardware-in-the-loop run: steady-state speed (mean over the last
+/// third) plus a short downsampled trace, so the device-driven track can be
+/// eyeballed against an in-process `polar`/fixed-heading run.
+#[cfg(feature = "hil")]
+fn report_hil_run(result: &scenario::SimResult, heading: f64) {
+    use state::{VEL_X, VEL_Y, YAW};
+    let n = result.x.len();
+    if n < 2 {
+        println!("HIL: no trajectory recorded (device did not respond?)");
+        return;
+    }
+    let start = n - n / 3;
+    let mut sum = 0.0;
+    for s in &result.x[start..] {
+        sum += (s[VEL_X] * s[VEL_X] + s[VEL_Y] * s[VEL_Y]).sqrt();
+    }
+    let speed = sum / (n - start) as f64;
+    println!(
+        "HIL: target heading {:.0}°, steady speed {:.2} m/s ({:.2} kn) over {} steps",
+        heading.to_degrees().rem_euclid(360.0),
+        speed,
+        speed * 1.94384,
+        result.rudder.len(),
+    );
+    println!("  t,heading_deg,speed,sail_deg,rudder_deg");
+    for k in 0..=10 {
+        let i = (k * (n - 1)) / 10;
+        let s = &result.x[i];
+        let sp = (s[VEL_X] * s[VEL_X] + s[VEL_Y] * s[VEL_Y]).sqrt();
+        let si = i.min(result.sail.len().saturating_sub(1));
+        println!(
+            "  {:.0},{:.0},{:.2},{:.0},{:.0}",
+            result.t[i],
+            s[YAW].to_degrees().rem_euclid(360.0),
+            sp,
+            result.sail[si].to_degrees(),
+            result.rudder[si].to_degrees(),
+        );
+    }
 }
 
 /// Time (s) the boat captures the final waypoint, or `None` if it never

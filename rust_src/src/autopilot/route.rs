@@ -7,7 +7,7 @@ use std::f64::consts::PI;
 use crate::autopilot::{Autopilot, Command, Observation};
 use crate::chart::Chart;
 use crate::config::Config;
-use crate::controller::HeadingController;
+use crate::controller::{new_from_config, HeadingController};
 use crate::current_model::TideForecast;
 use crate::physics::wind::{calculate_apparent_wind, TrueWind};
 use crate::planner::{plan, simplify, PlanConfig, Polar};
@@ -132,7 +132,7 @@ impl RouteAutopilot {
     ) -> Self {
         Self {
             follower: RouteFollower::new(route),
-            heading_controller: HeadingController::new(cfg, control_period_s),
+            heading_controller: new_from_config(cfg, control_period_s),
             sail_stretching: cfg.boat.sail.stretching,
             sail_resample_period_s,
             last_sail_mag: 0.0,
