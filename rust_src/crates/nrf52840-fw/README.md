@@ -55,3 +55,29 @@ cargo run --features hil -- --scenario hil --hil-port /dev/ttyACM0 --hil-twa-deg
 The host prints the steady-state speed and a short trace; compare it against the
 in-process `--scenario polar` run at the same true-wind angle to confirm the
 device produces the same control behaviour.
+
+## Optional status screen
+
+Build with `--features display` to drive a 128x64 SSD1306 I2C OLED that shows
+the live controller output and sensors each tick:
+
+```
+HDG  90  SPD 1.42
+AWA  -78 AWS  4.8
+RUDDER  -3.2 deg     [====|       ]   (centre-zero rudder bar)
+SAIL    41.0 deg     [======      ]   (0..90° sail bar)
+```
+
+- `HDG`/`SPD`: heading (deg) and through-water speed (m/s) from the sensor packet.
+- `AWA`/`AWS`: apparent wind angle (deg) and speed (m/s), computed on-device.
+- `RUDDER`/`SAIL`: the controller's commanded actuator angles, with bar gauges.
+
+Wiring (defaults, change in `main.rs`): **P0.26 = SDA, P0.27 = SCL** on `TWISPI0`
+(I2C @ 400 kHz). Without the feature the screen code compiles out to a no-op, so
+the base firmware stays ~34 KB (vs ~58 KB with the display). A dead/absent panel
+never blocks the controller — init and draw errors are ignored.
+
+```bash
+cargo build --release --features display
+cargo run   --release --features display    # flash + run with a probe attached
+```
