@@ -905,6 +905,7 @@ dependencies = [
  "embassy-time",
  "embassy-usb",
  "embedded-graphics",
+ "embedded-hal-async",
  "embedded-hal-bus",
  "heapless 0.8.0",
  "lora-phy",

@@ -13,12 +13,15 @@
 
 #![no_std]
 #![no_main]
+// In bridge builds the controller path (Autopilot, control_loop) is compiled but
+// unused — the board only relays. Silence the dead-code warnings for that build.
+#![cfg_attr(feature = "bridge", allow(dead_code))]
 
 use defmt::{info, warn};
 use embassy_executor::Spawner;
-#[cfg(not(feature = "lora"))]
+#[cfg(any(not(feature = "lora"), feature = "bridge"))]
 use embassy_futures::join::join;
-#[cfg(feature = "lora")]
+#[cfg(all(feature = "lora", not(feature = "bridge")))]
 use embassy_futures::join::join3;
 use embassy_nrf::usb::vbus_detect::HardwareVbusDetect;
 use embassy_nrf::usb::Driver;
@@ -160,51 +163,63 @@ async fn main(_spawner: Spawner) {
     let mut class = CdcAcmClass::new(&mut builder, &mut state, 64);
     let mut usb = builder.build();
 
-    // Optional OLED status screen on TWISPI0 (I2C). Default pins: P0.26 = SDA,
-    // P0.27 = SCL (nRF52840-DK Arduino header / common breakout wiring); change
-    // to suit your board. Without `--features display` this is a no-op `()`.
-    #[cfg(feature = "display")]
-    let mut screen = {
-        let mut tcfg = twim::Config::default();
-        tcfg.frequency = twim::Frequency::K400;
-        let twi = twim::Twim::new(p.TWISPI0, Irqs, p.P0_26, p.P0_27, tcfg);
-        let iface = ssd1306::I2CDisplayInterface::new(twi);
-        let disp = ssd1306::Ssd1306::new(
-            iface,
-            ssd1306::size::DisplaySize128x64,
-            ssd1306::rotation::DisplayRotation::Rotate0,
-        )
-        .into_buffered_graphics_mode();
-        display::OledScreen::new(disp)
-    };
-    #[cfg(not(feature = "display"))]
-    let mut screen = ();
-
     let usb_fut = usb.run();
 
-    let control_fut = async {
-        let mut autopilot: Option<Autopilot> = None;
-        loop {
-            class.wait_connection().await;
-            info!("host connected");
-            if control_loop(&mut class, &mut autopilot, &mut screen).await.is_err() {
-                warn!("host disconnected");
-            }
-        }
-    };
-
-    // Optional SX1262 LoRa supervisory link on SPI3. Default DK Arduino-header
-    // pins: SCK=P1.15(D13) MISO=P1.14(D12) MOSI=P1.13(D11) NSS=P1.12(D10)
-    // RESET=P1.11(D9) BUSY=P1.10(D8) DIO1=P1.08(D7). See radio.rs.
-    #[cfg(feature = "lora")]
+    // --- Shore-bridge role: relay USB <-> LoRa, no controller ---------------
+    #[cfg(feature = "bridge")]
     {
-        let lora_fut = radio::run(
-            p.SPI3, p.P1_15, p.P1_14, p.P1_13, p.P1_12, p.P1_11, p.P1_10, p.P1_08,
+        info!("running as LoRa <-> USB bridge");
+        let bridge_fut = radio::run_bridge(
+            &mut class, p.SPI3, p.P1_15, p.P1_14, p.P1_13, p.P1_12, p.P1_11, p.P1_10, p.P1_08,
         );
-        join3(usb_fut, control_fut, lora_fut).await;
+        join(usb_fut, bridge_fut).await;
     }
-    #[cfg(not(feature = "lora"))]
-    join(usb_fut, control_fut).await;
+
+    // --- Boat role: run the controller (and optional LoRa node) -------------
+    #[cfg(not(feature = "bridge"))]
+    {
+        // Optional OLED status screen on TWISPI0 (I2C). Default pins: P0.26 =
+        // SDA, P0.27 = SCL (DK Arduino header). Without `--features display`
+        // this is a no-op `()`.
+        #[cfg(feature = "display")]
+        let mut screen = {
+            let mut tcfg = twim::Config::default();
+            tcfg.frequency = twim::Frequency::K400;
+            let twi = twim::Twim::new(p.TWISPI0, Irqs, p.P0_26, p.P0_27, tcfg);
+            let iface = ssd1306::I2CDisplayInterface::new(twi);
+            let disp = ssd1306::Ssd1306::new(
+                iface,
+                ssd1306::size::DisplaySize128x64,
+                ssd1306::rotation::DisplayRotation::Rotate0,
+            )
+            .into_buffered_graphics_mode();
+            display::OledScreen::new(disp)
+        };
+        #[cfg(not(feature = "display"))]
+        let mut screen = ();
+
+        let control_fut = async {
+            let mut autopilot: Option<Autopilot> = None;
+            loop {
+                class.wait_connection().await;
+                info!("host connected");
+                if control_loop(&mut class, &mut autopilot, &mut screen).await.is_err() {
+                    warn!("host disconnected");
+                }
+            }
+        };
+
+        // Optional SX1262 LoRa supervisory link on SPI3 (DK Arduino header).
+        #[cfg(feature = "lora")]
+        {
+            let lora_fut = radio::run_node(
+                p.SPI3, p.P1_15, p.P1_14, p.P1_13, p.P1_12, p.P1_11, p.P1_10, p.P1_08,
+            );
+            join3(usb_fut, control_fut, lora_fut).await;
+        }
+        #[cfg(not(feature = "lora"))]
+        join(usb_fut, control_fut).await;
+    }
 }
 
 struct Disconnected;
